@@ -1,0 +1,23 @@
+{
+  "profiles": {
+    "DataverseToSql.Cli": {
+      "commandName": "Project"
+    },
+    "init": {
+      "commandName": "Project",
+      "commandLineArgs": "init -p ./test"
+    },
+    "deploy": {
+      "commandName": "Project",
+      "commandLineArgs": "deploy -p ./test"
+    },
+    "add-all": {
+      "commandName": "Project",
+      "commandLineArgs": "add --all -p ./test"
+    },
+    "add-non-existing-entity": {
+      "commandName": "Project",
+      "commandLineArgs": "add --name non-existing-entity -p ./test"
+    }
+  }
+}
