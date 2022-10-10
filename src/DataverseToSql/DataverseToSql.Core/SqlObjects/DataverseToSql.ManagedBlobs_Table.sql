@@ -1,4 +1,7 @@
-﻿CREATE TABLE [DataverseToSql].[ManagedBlobs] (
+﻿-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT License.
+
+CREATE TABLE [DataverseToSql].[ManagedBlobs] (
 	[EntityName] [DataverseToSql].[EntityType] NOT NULL,
 	[BlobName] [DataverseToSql].[BlobNameType] NOT NULL,
 	[FileOffset] BIGINT NOT NULL,

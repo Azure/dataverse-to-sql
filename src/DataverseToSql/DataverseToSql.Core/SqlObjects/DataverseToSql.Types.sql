@@ -1,4 +1,7 @@
-﻿CREATE TYPE [DataverseToSql].[EntityType]
+﻿-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT License.
+
+CREATE TYPE [DataverseToSql].[EntityType]
 	FROM NVARCHAR(128);
 GO
 

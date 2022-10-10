@@ -1,4 +1,7 @@
-﻿CREATE TABLE [$$SCHEMA$$].[TargetMetadata] (
+﻿-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT License.
+
+CREATE TABLE [$$SCHEMA$$].[TargetMetadata] (
 	[EntityName] [varchar](128) NULL,
 	[AttributeName] [varchar](128) NULL,
 	[ReferencedEntity] [varchar](128) NULL,

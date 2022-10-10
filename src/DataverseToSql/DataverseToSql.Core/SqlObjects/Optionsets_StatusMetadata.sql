@@ -1,4 +1,7 @@
-﻿CREATE TABLE [$$SCHEMA$$].[StatusMetadata] (
+﻿-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT License.
+
+CREATE TABLE [$$SCHEMA$$].[StatusMetadata] (
 	[EntityName] [varchar](128) NULL,
 	[State] [bigint] NULL,
 	[Status] [bigint] NULL,

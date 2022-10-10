@@ -1,4 +1,7 @@
-﻿namespace DataverseToSql.Core.Model
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+namespace DataverseToSql.Core.Model
 {
     /// <summary>
     /// Represents a blob to be ingested by the Synapse ingestion pipeline.

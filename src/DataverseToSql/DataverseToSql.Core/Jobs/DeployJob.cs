@@ -1,4 +1,7 @@
-﻿using Azure.Analytics.Synapse.Artifacts;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using Azure.Analytics.Synapse.Artifacts;
 using Azure.Analytics.Synapse.Artifacts.Models;
 using Azure.Storage.Blobs;
 using Microsoft.Data.SqlClient;
