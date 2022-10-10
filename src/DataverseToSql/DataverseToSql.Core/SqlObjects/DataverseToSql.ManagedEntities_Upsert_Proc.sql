@@ -1,4 +1,7 @@
-﻿CREATE PROCEDURE [DataverseToSql].[ManagedEntities_Upsert]
+﻿-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT License.
+
+CREATE PROCEDURE [DataverseToSql].[ManagedEntities_Upsert]
 	@EntityName [DataverseToSql].[EntityType],
 	@State INT = NULL,
 	@SchemaHash NVARCHAR(128) = NULL

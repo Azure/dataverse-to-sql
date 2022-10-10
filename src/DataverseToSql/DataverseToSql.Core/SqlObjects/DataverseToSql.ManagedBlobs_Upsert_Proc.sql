@@ -1,4 +1,7 @@
-﻿CREATE PROCEDURE [DataverseToSql].[ManagedBlobs_Upsert]
+﻿-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT License.
+
+CREATE PROCEDURE [DataverseToSql].[ManagedBlobs_Upsert]
 	@EntityName [DataverseToSql].[EntityType],
 	@BlobName [DataverseToSql].[BlobNameType],
 	@FileOffset BIGINT

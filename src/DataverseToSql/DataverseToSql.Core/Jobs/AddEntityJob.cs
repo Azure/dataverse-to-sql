@@ -1,4 +1,7 @@
-﻿using DataverseToSql.Core.Model;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using DataverseToSql.Core.Model;
 using Microsoft.Extensions.Logging;
 using System.Security.AccessControl;
 

@@ -1,4 +1,7 @@
-﻿using Azure.Core;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using Azure.Core;
 using DataverseToSql.Core.Auth;
 using DataverseToSql.Core.Model;
 using Microsoft.Data.SqlClient;

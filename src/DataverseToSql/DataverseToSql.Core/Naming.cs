@@ -1,4 +1,7 @@
-﻿using DataverseToSql.Core.CdmModel;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using DataverseToSql.Core.CdmModel;
 
 namespace DataverseToSql.Core
 {

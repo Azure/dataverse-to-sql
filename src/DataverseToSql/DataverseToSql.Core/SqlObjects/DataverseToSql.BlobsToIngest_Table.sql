@@ -1,4 +1,7 @@
-﻿CREATE TABLE [DataverseToSql].[BlobsToIngest] (
+﻿-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT License.
+
+CREATE TABLE [DataverseToSql].[BlobsToIngest] (
 	[Id] INT IDENTITY PRIMARY KEY,
 	[EntityName] [DataverseToSql].[EntityType] NOT NULL,
 	[BlobName] [DataverseToSql].[BlobNameType] NOT NULL,

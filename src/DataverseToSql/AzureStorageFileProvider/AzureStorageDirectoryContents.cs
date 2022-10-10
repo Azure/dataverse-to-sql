@@ -1,4 +1,7 @@
-﻿using Microsoft.Extensions.FileProviders;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using Microsoft.Extensions.FileProviders;
 using System.Collections;
 
 namespace AzureStorageFileProvider

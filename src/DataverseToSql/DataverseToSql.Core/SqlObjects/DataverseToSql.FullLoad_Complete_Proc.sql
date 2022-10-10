@@ -1,4 +1,7 @@
-﻿CREATE PROCEDURE [DataverseToSql].[FullLoad_Complete]
+﻿-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT License.
+
+CREATE PROCEDURE [DataverseToSql].[FullLoad_Complete]
 AS
 BEGIN TRAN
 

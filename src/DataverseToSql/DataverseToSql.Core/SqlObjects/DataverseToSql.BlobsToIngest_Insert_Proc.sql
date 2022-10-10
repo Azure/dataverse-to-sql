@@ -1,4 +1,7 @@
-﻿CREATE PROCEDURE [DataverseToSql].[BlobsToIngest_Insert]
+﻿-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT License.
+
+CREATE PROCEDURE [DataverseToSql].[BlobsToIngest_Insert]
 	@EntityName [DataverseToSql].[EntityType],
 	@BlobName [DataverseToSql].[BlobNameType],
 	@TargetSchema SYSNAME,

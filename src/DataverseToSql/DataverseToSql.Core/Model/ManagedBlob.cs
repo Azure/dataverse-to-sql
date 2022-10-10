@@ -1,4 +1,7 @@
-﻿namespace DataverseToSql.Core.Model
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+namespace DataverseToSql.Core.Model
 {
     /// <summary>
     /// Represents a blob that is beign tracked for incremental ingestion.

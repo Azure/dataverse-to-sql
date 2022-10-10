@@ -1,4 +1,7 @@
-﻿using Azure.Identity;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using Azure.Identity;
 using DataverseToSql.Core.Jobs;
 using Microsoft.Extensions.Logging;
 using System.CommandLine;

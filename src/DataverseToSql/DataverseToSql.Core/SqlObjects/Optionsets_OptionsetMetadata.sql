@@ -1,4 +1,7 @@
-﻿CREATE TABLE [$$SCHEMA$$].[OptionsetMetadata] (
+﻿-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT License.
+
+CREATE TABLE [$$SCHEMA$$].[OptionsetMetadata] (
 	[EntityName] [varchar](128) NULL,
 	[OptionSetName] [varchar](128)  NULL,
 	[Option] [bigint] NULL,

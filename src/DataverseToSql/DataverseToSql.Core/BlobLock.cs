@@ -1,4 +1,7 @@
-﻿using Azure.Storage.Blobs;
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 
 namespace DataverseToSql.Core

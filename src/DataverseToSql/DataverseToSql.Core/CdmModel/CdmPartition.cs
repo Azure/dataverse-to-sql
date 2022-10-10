@@ -1,4 +1,7 @@
-﻿namespace DataverseToSql.Core.CdmModel
+﻿// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+namespace DataverseToSql.Core.CdmModel
 {
     /// <summary>
     /// Represents a CDM entity partition as deserialized from a manifest.

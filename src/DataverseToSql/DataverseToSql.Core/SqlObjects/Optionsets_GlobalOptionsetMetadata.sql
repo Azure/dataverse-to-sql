@@ -1,4 +1,7 @@
-﻿CREATE TABLE [$$SCHEMA$$].[GlobalOptionsetMetadata] (
+﻿-- Copyright (c) Microsoft Corporation.
+-- Licensed under the MIT License.
+
+CREATE TABLE [$$SCHEMA$$].[GlobalOptionsetMetadata] (
 	[OptionSetName] [varchar](128) NULL,
 	[Option] [bigint] NULL,
 	[IsUserLocalizedLabel] [varchar](6) NULL,
