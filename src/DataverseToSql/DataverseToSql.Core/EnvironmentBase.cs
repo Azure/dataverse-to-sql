@@ -120,16 +120,28 @@ namespace DataverseToSql.Core
                         Credential);
 
                     // Deserialize the manifest
-                    var reader = new StreamReader(await blobClient.OpenReadAsync(default, ct));
-                    var cdmManifest = new CdmManifest(JObject.Parse(await reader.ReadToEndAsync()));
-
-                    foreach (var cdmEntity in cdmManifest.Entities)
+                    try
                     {
-                        // Add only entities whose InitialSyncState is "Completed"
-                        if (cdmEntity.InitialSyncState == "Completed")
+                        var reader = new StreamReader(await blobClient.OpenReadAsync(default, ct));
+                        var cdmManifest = new CdmManifest(JObject.Parse(await reader.ReadToEndAsync()));
+
+                        foreach (var cdmEntity in cdmManifest.Entities)
                         {
-                            dict[cdmEntity.Name.ToLower()] = cdmEntity;
+                            // Add only entities whose InitialSyncState is "Completed"
+                            if (cdmEntity.InitialSyncState == "Completed")
+                            {
+                                dict[cdmEntity.Name.ToLower()] = cdmEntity;
+                            }
                         }
+                    }
+                    catch (Exception ex)
+                    {
+                        log.LogWarning(
+                            "Failed to deserialized manifest {manifestUri} with error {message} " +
+                            "The ingestion of the entity may be still in progress; " +
+                            "the manifest may require up to one hour to be updated.",
+                            blobUri,
+                            ex.Message);
                     }
                 });
 
