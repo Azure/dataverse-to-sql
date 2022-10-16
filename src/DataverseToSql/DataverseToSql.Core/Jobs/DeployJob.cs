@@ -6,7 +6,9 @@ using Azure.Analytics.Synapse.Artifacts.Models;
 using Azure.Storage.Blobs;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
+using Microsoft.SqlServer.TransactSql.ScriptDom;
 using System.Data;
+using System.Net;
 using Expression = Azure.Analytics.Synapse.Artifacts.Models.Expression;
 using ExpressionType = Azure.Analytics.Synapse.Artifacts.Models.ExpressionType;
 using SwitchCase = Azure.Analytics.Synapse.Artifacts.Models.SwitchCase;
@@ -49,6 +51,9 @@ namespace DataverseToSql.Core.Jobs
 
             // Upload the configuration files to the configuration storage container
             UploadConfiguration();
+
+            // Upload custom SQL objects to the configuration storage container
+            UploadCustomSqlObjects();
 
             log.LogInformation("Successfully completed deployment.");
         }
@@ -319,7 +324,7 @@ namespace DataverseToSql.Core.Jobs
                 new Expression(ExpressionType.Expression,
                     "@variables('OptionsetTables')"),
                 new List<Activity>() { loadOptionsetActivity })
-            { 
+            {
                 BatchCount = environment.Config.Ingestion.Parallelism
             };
 
@@ -711,6 +716,65 @@ namespace DataverseToSql.Core.Jobs
 
             blobClient.Upload(
                 content: File.Open(environment.Config.ConfigFilePath, FileMode.Open),
+                overwrite: true);
+        }
+
+        // Upload custom SQL objects to the configuration storage container.
+        private void UploadCustomSqlObjects()
+        {
+            log.LogInformation("Uploading custom SQL objects.");
+
+            var customSqlObjectsFolder = Path.Combine(environment.LocalPath, EnvironmentBase.CUSTOM_SQL_OBJECTS_FOLDER);
+
+            var parser = new TSql160Parser(true, SqlEngineType.SqlAzure);
+
+            if (Directory.Exists(customSqlObjectsFolder))
+            {
+                foreach (var item in Directory.EnumerateFiles(customSqlObjectsFolder, "*", new EnumerationOptions() { RecurseSubdirectories = true }))
+                {
+                    var streamReader = new StreamReader(item, new FileStreamOptions() { Access = FileAccess.Read, Share = FileShare.Read });
+                    parser.Parse(streamReader, out var parseErrors);
+                    streamReader.Close();
+
+                    // Check if there is any syntax error
+                    if (parseErrors.Count > 0)
+                    {
+                        foreach (var error in parseErrors)
+                        {
+                            log.LogWarning(
+                                "Error in source file {source}: Code {errorcode}, Line {line}, Column {column}, {message}",
+                                item,
+                                error.Number,
+                                error.Line,
+                                error.Column,
+                                error.Message);
+                        }
+                    }
+                    else
+                    {
+                        var relativePath = Path.GetRelativePath(customSqlObjectsFolder, item);
+
+                        var blobUriBuilder = new BlobUriBuilder(environment.Config.ConfigurationStorage.ContainerUri());
+                        blobUriBuilder.BlobName = EnvironmentBase.CUSTOM_SQL_OBJECTS_FOLDER + "/" + relativePath.Replace("\\", "/");
+
+                        UploadFile(item, blobUriBuilder.ToUri());
+                    }
+                }
+            }
+            else
+            {
+                log.LogWarning("Custom SQL Object folder could not be found: {customSqlObjectsFolder}", customSqlObjectsFolder);
+            }
+        }
+
+        private void UploadFile(string sourcePath, Uri targetUri)
+        {
+            log.LogInformation("Uploading {sourcePath} to {targetUri}", sourcePath, targetUri);
+
+            var blobClient = new BlobClient(targetUri, environment.Credential);
+
+            blobClient.Upload(
+                content: File.Open(sourcePath, FileMode.Open, FileAccess.Read),
                 overwrite: true);
         }
     }

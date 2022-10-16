@@ -18,9 +18,10 @@ namespace DataverseToSql.Core
     /// - access to the managed entities
     /// - access to the underlying database
     /// </summary>
-    public class EnvironmentBase
+    public abstract class EnvironmentBase
     {
         internal const string CONFIG_FILE = "DataverseToSql.json";
+        internal const string CUSTOM_SQL_OBJECTS_FOLDER = "CustomSqlObjects";
 
         protected readonly ILogger log;
         internal readonly TokenCredential Credential;
@@ -30,6 +31,8 @@ namespace DataverseToSql.Core
 
         private IDictionary<string, CdmEntity>? _cdmEntityDict = null;
         private IDictionary<string, ManagedEntity>? _managedEntityDict = null;
+        private IList<(string name, string script)>? _customScripts = null;
+        private Dictionary<string, ManagedCustomScript>? _managedCustomScriptsDict = null;
 
         public EnvironmentBase(
             ILogger log,
@@ -166,5 +169,33 @@ namespace DataverseToSql.Core
         // Determines if the given entity (based on the name of a given CDM entity) is managed or not.
         internal async Task<bool> IsManagedEntityAsync(CdmEntity cdmEntity, CancellationToken cancellationToken)
             => await IsManagedEntityAsync(cdmEntity.Name, cancellationToken);
+
+        // Return all custom scripts contained in the environment.
+        internal async Task<IList<(string name, string script)>> GetCustomScriptsAsync(CancellationToken cancellationToken)
+        {
+            return _customScripts ??= (await InitCustomScriptsAsync(cancellationToken));
+        }
+
+        // Initialize list of custom scripts from storage.
+        internal abstract Task<IList<(string name, string script)>> InitCustomScriptsAsync(CancellationToken cancellationToken);
+
+        // Return a managed custom script by name. Return null if not found.
+        internal async Task<ManagedCustomScript?> GetManagedCustomScript(string name, CancellationToken cancellationToken)
+        {
+            (await GetManagedCustomScriptDict(cancellationToken)).TryGetValue(name.ToLower(), out ManagedCustomScript? result);
+            return result;
+        }
+
+        // Return the dictionary of managed custom script, indexed by name.
+        internal async Task<IDictionary<string, ManagedCustomScript>> GetManagedCustomScriptDict(CancellationToken cancellationToken)
+        {
+            if (_managedCustomScriptsDict is null)
+            {
+                var managedCustomScripts = await database.GetManagedCustomScriptsAsync(cancellationToken);
+                _managedCustomScriptsDict = managedCustomScripts.ToDictionary(k => k.Name.ToLower(), v => v);
+            }
+
+            return _managedCustomScriptsDict;
+        }
     }
 }

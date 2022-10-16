@@ -8,6 +8,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.SqlServer.Dac;
 using Microsoft.SqlServer.Dac.Model;
+using Microsoft.SqlServer.TransactSql.ScriptDom;
 using System.Data;
 
 namespace DataverseToSql.Core
@@ -63,6 +64,9 @@ namespace DataverseToSql.Core
 
                     _model.AddObjects(SqlObjects.DataverseToSql_FullLoad_Complete_Proc);
 
+                    _model.AddObjects(SqlObjects.DataverseToSql_ManagedCustomScripts_Table);
+                    _model.AddObjects(SqlObjects.DataverseToSql_ManagedCustomScripts_Upsert_Proc);
+
                     _model.AddObjects(SqlObjects.Optionsets_OptionsetMetadata.Replace(
                         "$$SCHEMA$$", Config.Schema));
 
@@ -91,6 +95,123 @@ namespace DataverseToSql.Core
         internal void AddObjects(string script)
         {
             Model.AddObjects(script);
+        }
+
+        /// <summary>
+        /// Tries to add the specified scripts to the DAC model.
+        /// Scripts that fail (e.g. due to syntax errors or missing dependencies) are skipped
+        /// and a warning message is produced.
+        /// </summary>
+        /// <param name="scripts">List of tuples with name and content of the scripts to add.
+        /// The name should correspond to the name of the script at the source (e.g. the original 
+        /// file name).</param>
+        internal void TryAddObjects(IEnumerable<(string name, string script)> scripts)
+        {
+            List<(string name, TSqlScript script)> InputScripts = new();
+            List<(string name, TSqlScript script)> FailedScripts = new();
+            Dictionary<string, IEnumerable<DacModelError>> SourceErrors = new();
+
+            // Parse all the scripts and skip those who generate a syntax error.
+            var parser = new TSql160Parser(true, SqlEngineType.SqlAzure);
+
+            foreach (var (name, script) in scripts)
+            {
+                var stringReader = new StringReader(script);
+                var tree = parser.Parse(stringReader, out var parseErrors);
+
+                // Check if there is any syntax error
+                if (parseErrors.Count > 0)
+                {
+                    foreach (var error in parseErrors)
+                    {
+                        log.LogWarning(
+                            "Error in source file {source}: Code {errorcode}, Line {line}, Column {column}, {message}",
+                            name,
+                            error.Number,
+                            error.Line,
+                            error.Column,
+                            error.Message);
+                    }
+                }
+                // If there is no error and the parser produced a valid TSqlScript object
+                // store the script in CurrentScripts for further processing
+                else if (tree is TSqlScript tsqlScript)
+                {
+                    InputScripts.Add((name, tsqlScript));
+                }
+                // If the parser did not produce a TSqlScript, skip the script
+                else
+                {
+                    log.LogWarning(
+                        "Error in source file {source}: the file is not a valid SQL script",
+                        name);
+                }
+            }
+
+            // Iterate over the input scripts and add them to the model.
+            // Validate the model after adding each script.
+            // If a script fails, remove it from the model.
+            // The order of iteration does not take into account dependencies between
+            // scripts, so scripts executed out of order may fail and be
+            // unnecessarily removed from the model.
+            // This is dealt with by trying the failed scripts again until all
+            // dependencies are resolved and FailedScripts list is left only with
+            // scripts that fail due to other reasons.
+            var counter = 0;
+            while (true)
+            {
+                foreach (var source in InputScripts)
+                {
+                    // counter is used as a label to add/remove scripts to/from the model
+                    counter++;
+                    Model.AddOrUpdateObjects(source.script, counter.ToString(), default);
+
+                    // Check if the model contains any error.
+                    // The check is performed against Azure SQL Databse version both to validate
+                    // the code is compatible with it and to get reacher error details.
+                    var result = Model.CheckVersionCompatibility(SqlServerVersion.SqlAzure, default);
+                    if (result.Any())
+                    {
+                        FailedScripts.Add(source);                  // Track the failed script
+                        Model.DeleteObjects(counter.ToString());    // Remove the script from the model
+                        SourceErrors[source.name] = result;         // Track the errors
+                    }
+                }
+
+                // If the number of failed scripts is equal to the number of input scripts
+                // it means all dependencies were resolved and we are left with scripts
+                // that fail for other reasons, or with no failing script at all.
+                if (FailedScripts.Count == InputScripts.Count)
+                {
+                    break;
+                }
+
+                // Repeat the loop over any remaining failed script
+                InputScripts = FailedScripts;
+                FailedScripts = new();
+            }
+
+            // Produce a warning for each error of the failing scripts
+            foreach (var (name, _) in FailedScripts)
+            {
+                if (SourceErrors.ContainsKey(name))
+                {
+                    foreach (var error in SourceErrors[name])
+                    {
+                        log.LogWarning(
+                            "Error in source file {source}: Code {errorcode}, Line {line}, Column {column}, {message}",
+                            name,
+                            error.ErrorCode,
+                            error.Line,
+                            error.Column,
+                            error.Message);
+                    }
+                }
+                else
+                {
+                    log.LogWarning("Error in source file {source}.", name);
+                }
+            }
         }
 
         internal void DeployModel()
@@ -147,7 +268,7 @@ namespace DataverseToSql.Core
             //    new TokenRequestContext(new[] { "https://database.windows.net/.default" }),
             //    default //cancellationToken
             //    )).Token;
-            
+
             var token = (Credential.GetToken(
                 new[] { "https://database.windows.net/.default" }
                 ));
@@ -200,9 +321,27 @@ namespace DataverseToSql.Core
             conn.Close();
         }
 
+        internal async Task UpsertAsync(
+            ManagedCustomScript managedCustomScript,
+            CancellationToken cancellationToken)
+        {
+            var conn = await GetSqlConnectionAsync(cancellationToken);
+            var cmd = conn.CreateCommand();
+            cmd.CommandType = CommandType.StoredProcedure;
+            cmd.CommandText = "[DataverseToSql].[ManagedCustomScripts_Upsert]";
+            cmd.Parameters.Add(new() { ParameterName = "@ScriptName" });
+            cmd.Parameters.Add(new() { ParameterName = "@Hash" });
+
+            cmd.Parameters["@ScriptName"].Value = managedCustomScript.Name;
+            cmd.Parameters["@Hash"].Value = managedCustomScript.Hash;
+
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+            conn.Close();
+        }
+
         internal async Task<bool> IsTableEmptyAsync(
             string name,
-            string? schema = null, 
+            string? schema = null,
             CancellationToken cancellationToken = default)
         {
             schema ??= Config.Schema;
@@ -297,6 +436,27 @@ namespace DataverseToSql.Core
 
             await cmd.ExecuteNonQueryAsync(cancellationToken);
             conn.Close();
+        }
+
+        internal async Task<List<ManagedCustomScript>> GetManagedCustomScriptsAsync(CancellationToken cancellationToken)
+        {
+            var conn = await GetSqlConnectionAsync(cancellationToken);
+            var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT [ScriptName],[Hash] FROM [DataverseToSql].[ManagedCustomScripts];";
+
+            List<ManagedCustomScript> result = new();
+
+            var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                result.Add(new ManagedCustomScript(
+                    reader.GetString(0),
+                    reader.GetString(1)));
+            }
+            reader.Close();
+            conn.Close();
+
+            return result;
         }
     }
 }

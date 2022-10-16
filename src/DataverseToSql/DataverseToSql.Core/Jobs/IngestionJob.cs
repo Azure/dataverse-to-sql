@@ -114,6 +114,7 @@ namespace DataverseToSql.Core.Jobs
             // or any existing entity whose schema changed since last deployment
             if ((await environment.GetManagedEntitiesAsync(cancellationToken))
                 .Where(e => e.State == ManagedEntityState.New).Any()
+                || await HasAnyCustomScriptChangedAsync(cancellationToken)
                 || await HasAnySchemaChangedAsync(cancellationToken))
             {
                 log.LogInformation("Detected schema changes.");
@@ -121,7 +122,21 @@ namespace DataverseToSql.Core.Jobs
             }
         }
 
-        // Compare the hash of the schema of each entity with what previusly stored
+        // Compare the hash of each custom script with what previously stored
+        private async Task<bool> HasAnyCustomScriptChangedAsync(CancellationToken cancellationToken)
+        {
+            foreach (var script in await environment.GetCustomScriptsAsync(cancellationToken))
+            {
+                var managedCustomScript = await environment.GetManagedCustomScript(script.name, cancellationToken);
+
+                if (managedCustomScript is null) return true; // Detected a new custom script
+                if (managedCustomScript.Hash != script.script.Sha1()) return true; // Detected change in the script
+            }
+
+            return false; // No change detected
+        }
+
+        // Compare the hash of the schema of each entity with what previously stored
         private async Task<bool> HasAnySchemaChangedAsync(CancellationToken cancellationToken)
         {
             foreach (var managedEntity in await environment.GetManagedEntitiesAsync(cancellationToken))
@@ -160,6 +175,10 @@ namespace DataverseToSql.Core.Jobs
                 }
             }
 
+            // Add custom objects
+            environment.database.TryAddObjects(
+                (await environment.GetCustomScriptsAsync(cancellationToken)));
+
             // Deploy the schema
             environment.database.DeployModel();
 
@@ -170,6 +189,16 @@ namespace DataverseToSql.Core.Jobs
                 if (managedEntity.State == ManagedEntityState.New)
                     managedEntity.State = ManagedEntityState.PendingInitialIngestion;
                 await environment.database.UpsertAsync(managedEntity, cancellationToken);
+            }
+
+            // Update custom scripts metadata
+            foreach (var (name, script) in (await environment.GetCustomScriptsAsync(cancellationToken)))
+            {
+                var managedCustomScript = new ManagedCustomScript(
+                    name,
+                    script.Sha1());
+
+                await environment.database.UpsertAsync(managedCustomScript, cancellationToken);
             }
         }
 

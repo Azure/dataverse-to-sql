@@ -139,6 +139,12 @@
   <data name="DataverseToSql_ManagedBlobs_Upsert_Proc" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>sqlobjects\dataversetosql.managedblobs_upsert_proc.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
   </data>
+  <data name="DataverseToSql_ManagedCustomScripts_Table" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>sqlobjects\dataversetosql.managedcustomscripts_table.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
+  </data>
+  <data name="DataverseToSql_ManagedCustomScripts_Upsert_Proc" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>sqlobjects\dataversetosql.managedcustomscripts_upsert_proc.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
+  </data>
   <data name="DataverseToSql_ManagedEntities_Table" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>sqlobjects\dataversetosql.managedentities_table.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
   </data>

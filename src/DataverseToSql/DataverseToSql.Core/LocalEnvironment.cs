@@ -13,9 +13,13 @@ namespace DataverseToSql.Core
     /// </summary>
     public class LocalEnvironment : EnvironmentBase
     {
+        public readonly string LocalPath;
+
         public LocalEnvironment(ILogger log, TokenCredential credential, string path)
             : base(log, credential, ReadConfig(log, path))
-        { }
+        {
+            LocalPath = path;
+        }
 
         // Loads configuration from the specified path.
         private static EnvironmentConfiguration ReadConfig(ILogger log, string path)
@@ -92,7 +96,30 @@ namespace DataverseToSql.Core
                 throw new Exception("Error creating configuration file.", ex);
             }
 
+            // Create custom SQL objects folder
+
+            var customSqlObjectsFolderName = Path.Join(environmentPath, CUSTOM_SQL_OBJECTS_FOLDER);
+
+            if (!Directory.Exists(customSqlObjectsFolderName))
+            {
+                try
+                {
+                    log.LogInformation("Creating custom SQL objects folder {customSqlObjectsFolderName}.",
+                        customSqlObjectsFolderName);
+                    Directory.CreateDirectory(customSqlObjectsFolderName);
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception("Error creating custom SQL objects folder.", ex);
+                }
+            }
+
             log.LogInformation("Successfully initialized the environment.");
+        }
+
+        internal override Task<IList<(string name, string script)>> InitCustomScriptsAsync(CancellationToken cancellationToken)
+        {
+            throw new NotImplementedException();
         }
     }
 }
