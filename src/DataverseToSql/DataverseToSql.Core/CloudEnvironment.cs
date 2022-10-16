@@ -42,5 +42,30 @@ namespace DataverseToSql.Core
                     $"Cannot load configuration: {ex.Message}", ex);
             }
         }
+
+        internal override async Task<IList<(string name, string script)>> InitCustomScriptsAsync(CancellationToken cancellationToken)
+        {
+            List<(string name, string script)> customScripts = new();
+
+            var containerClient = new BlobContainerClient(
+                Config.ConfigurationStorage.ContainerUri(), 
+                Credential);
+
+            await foreach (var item in containerClient.GetBlobsByHierarchyAsync(
+                prefix: $"{CUSTOM_SQL_OBJECTS_FOLDER}/",
+                cancellationToken: cancellationToken))
+            {
+                if (item.IsBlob && item.Blob.Properties.ContentLength > 0)
+                {
+                    var blobClient = containerClient.GetBlobClient(item.Blob.Name);
+                    var stream = await blobClient.OpenReadAsync(cancellationToken: cancellationToken);
+                    var streamReader = new StreamReader(stream);
+                    var script = await streamReader.ReadToEndAsync();
+                    customScripts.Add((item.Blob.Name, script));
+                }
+            }
+
+            return customScripts;
+        }
     }
 }

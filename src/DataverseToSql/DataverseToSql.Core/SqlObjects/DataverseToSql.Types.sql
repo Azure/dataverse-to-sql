@@ -8,3 +8,7 @@ GO
 CREATE TYPE [DataverseToSql].[BlobNameType]
 	FROM NVARCHAR(722);
 GO
+
+CREATE TYPE [DataverseToSql].[CustomScriptNameType]
+	FROM NVARCHAR(512);
+GO

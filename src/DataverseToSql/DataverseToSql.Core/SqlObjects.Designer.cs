@@ -61,7 +61,10 @@ namespace DataverseToSql.Core {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to CREATE PROCEDURE [DataverseToSql].[BlobsToIngest_Complete]
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
+        ///CREATE PROCEDURE [DataverseToSql].[BlobsToIngest_Complete]
         ///	@EntityName [DataverseToSql].[EntityType],
         ///	@BlobName [DataverseToSql].[BlobNameType]
         ///AS
@@ -75,10 +78,7 @@ namespace DataverseToSql.Core {
         ///		AND [LoadType] = 0 -- Full
         ///
         ///-- Delete the blob record if the load is &quot;incremental&quot;
-        ///DELETE	[DataverseToSql].[BlobsToIngest]
-        ///WHERE
-        ///		[EntityName] = @EntityName
-        ///		AND [B [rest of string was truncated]&quot;;.
+        ///DELETE	 [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string DataverseToSql_BlobsToIngest_Complete_Proc {
             get {
@@ -87,7 +87,10 @@ namespace DataverseToSql.Core {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to CREATE PROCEDURE [DataverseToSql].[BlobsToIngest_Get]
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
+        ///CREATE PROCEDURE [DataverseToSql].[BlobsToIngest_Get]
         ///AS
         ///SELECT
         ///	[EntityName],
@@ -98,6 +101,8 @@ namespace DataverseToSql.Core {
         ///	[LoadType]
         ///FROM
         ///	[DataverseToSql].[BlobsToIngest]
+        ///WHERE
+        ///	[Complete] = 0
         ///ORDER BY
         ///	[BlobName].
         /// </summary>
@@ -108,7 +113,10 @@ namespace DataverseToSql.Core {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to CREATE PROCEDURE [DataverseToSql].[BlobsToIngest_Insert]
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
+        ///CREATE PROCEDURE [DataverseToSql].[BlobsToIngest_Insert]
         ///	@EntityName [DataverseToSql].[EntityType],
         ///	@BlobName [DataverseToSql].[BlobNameType],
         ///	@TargetSchema SYSNAME,
@@ -123,12 +131,7 @@ namespace DataverseToSql.Core {
         ///		AND [BlobName] = @BlobName
         ///)
         ///BEGIN
-        ///	INSERT INTO [DataverseToSql].[BlobsToIngest](
-        ///		[EntityName],
-        ///		[BlobName],
-        ///		[TargetSchema],
-        ///		[TargetTable],
-        /// [rest of string was truncated]&quot;;.
+        ///	INSERT INTO [DataverseToSql].[BlobsTo [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string DataverseToSql_BlobsToIngest_Insert_Proc {
             get {
@@ -137,7 +140,10 @@ namespace DataverseToSql.Core {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to CREATE TABLE [DataverseToSql].[BlobsToIngest] (
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
+        ///CREATE TABLE [DataverseToSql].[BlobsToIngest] (
         ///	[Id] INT IDENTITY PRIMARY KEY,
         ///	[EntityName] [DataverseToSql].[EntityType] NOT NULL,
         ///	[BlobName] [DataverseToSql].[BlobNameType] NOT NULL,
@@ -146,9 +152,7 @@ namespace DataverseToSql.Core {
         ///	[ServerlessQuery] NVARCHAR(MAX) NOT NULL,
         ///	[LoadType] INT NOT NULL,
         ///	[Complete] INT NOT NULL DEFAULT 0,
-        ///	CONSTRAINT UQ_BlobsToIngest UNIQUE ([EntityName], [BlobName]),
-        ///	CONSTRAINT FK_BlobsToIngest_Entities
-        ///		FOREIGN KEY ([EntityName]) REFERENCES [rest of string was truncated]&quot;;.
+        ///	CONSTRAINT UQ_BlobsToIngest UNIQUE ([EntityName], [BlobName]),        /// [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string DataverseToSql_BlobsToIngest_Table {
             get {
@@ -157,7 +161,10 @@ namespace DataverseToSql.Core {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to CREATE PROCEDURE [DataverseToSql].[FullLoad_Complete]
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
+        ///CREATE PROCEDURE [DataverseToSql].[FullLoad_Complete]
         ///AS
         ///BEGIN TRAN
         ///
@@ -166,7 +173,7 @@ namespace DataverseToSql.Core {
         ///)
         ///
         ///UPDATE [DataverseToSql].[ManagedEntities]
-        ///SET [State] = 2 -- Ready
+        ///SET [State] = 3 -- Ready
         ///OUTPUT inserted.[EntityName] 
         ///	INTO @CompletedEntities
         ///WHERE [EntityName] IN (
@@ -177,12 +184,7 @@ namespace DataverseToSql.Core {
         ///	GROUP BY
         ///		[EntityName]
         ///	HAVING
-        ///		MIN([Complete]) = 1
-        ///		AND MAX([Complete]) = 1
-        ///)
-        ///
-        ///DELETE f
-        ///FROM [DataverseToSql].[BlobsToInge [rest of string was truncated]&quot;;.
+        ///		MIN([Complete]) =  [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string DataverseToSql_FullLoad_Complete_Proc {
             get {
@@ -191,7 +193,10 @@ namespace DataverseToSql.Core {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to CREATE TABLE [DataverseToSql].[ManagedBlobs] (
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
+        ///CREATE TABLE [DataverseToSql].[ManagedBlobs] (
         ///	[EntityName] [DataverseToSql].[EntityType] NOT NULL,
         ///	[BlobName] [DataverseToSql].[BlobNameType] NOT NULL,
         ///	[FileOffset] BIGINT NOT NULL,
@@ -206,7 +211,10 @@ namespace DataverseToSql.Core {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to CREATE PROCEDURE [DataverseToSql].[ManagedBlobs_Upsert]
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
+        ///CREATE PROCEDURE [DataverseToSql].[ManagedBlobs_Upsert]
         ///	@EntityName [DataverseToSql].[EntityType],
         ///	@BlobName [DataverseToSql].[BlobNameType],
         ///	@FileOffset BIGINT
@@ -224,14 +232,7 @@ namespace DataverseToSql.Core {
         ///		[FileOffset]
         ///	)
         ///	VALUES (
-        ///		@EntityName,
-        ///		@BlobName,
-        ///		@FileOffset
-        ///	)
-        ///END
-        ///ELSE
-        ///BEGIN
-        ///	UPDATE [DataverseTo [rest of string was truncated]&quot;;.
+        ///		@Entit [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string DataverseToSql_ManagedBlobs_Upsert_Proc {
             get {
@@ -240,7 +241,58 @@ namespace DataverseToSql.Core {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to CREATE TABLE [DataverseToSql].[ManagedEntities] (
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
+        ///CREATE TABLE [DataverseToSql].[ManagedCustomScripts] (
+        ///	[ScriptName] [DataverseToSql].[CustomScriptNameType] NOT NULL PRIMARY KEY,
+        ///	[Hash] NVARCHAR(128) NULL
+        ///).
+        /// </summary>
+        internal static string DataverseToSql_ManagedCustomScripts_Table {
+            get {
+                return ResourceManager.GetString("DataverseToSql_ManagedCustomScripts_Table", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
+        ///CREATE PROCEDURE [DataverseToSql].[ManagedCustomScripts_Upsert]
+        ///	@ScriptName [DataverseToSql].[CustomScriptNameType],
+        ///	@Hash  NVARCHAR(128)
+        ///AS
+        ///IF NOT EXISTS (
+        ///	SELECT * FROM [DataverseToSql].[ManagedCustomScripts]
+        ///	WHERE
+        ///		[ScriptName] = @EntityName
+        ///)
+        ///BEGIN
+        ///	INSERT INTO [DataverseToSql].[ManagedCustomScripts](
+        ///		[ScriptName],
+        ///		[Hash]
+        ///	)
+        ///	VALUES (
+        ///		@ScriptName,
+        ///		@Hash
+        ///	)
+        ///END
+        ///ELSE
+        ///BEGIN
+        ///	UPDATE [DataverseToS [rest of string was truncated]&quot;;.
+        /// </summary>
+        internal static string DataverseToSql_ManagedCustomScripts_Upsert_Proc {
+            get {
+                return ResourceManager.GetString("DataverseToSql_ManagedCustomScripts_Upsert_Proc", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
+        ///CREATE TABLE [DataverseToSql].[ManagedEntities] (
         ///	[EntityName] [DataverseToSql].[EntityType] NOT NULL PRIMARY KEY,
         ///	[State] INT NOT NULL,
         ///	[SchemaHash] NVARCHAR(128) NULL
@@ -253,7 +305,10 @@ namespace DataverseToSql.Core {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to CREATE PROCEDURE [DataverseToSql].[ManagedEntities_Upsert]
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
+        ///CREATE PROCEDURE [DataverseToSql].[ManagedEntities_Upsert]
         ///	@EntityName [DataverseToSql].[EntityType],
         ///	@State INT = NULL,
         ///	@SchemaHash NVARCHAR(128) = NULL
@@ -272,13 +327,7 @@ namespace DataverseToSql.Core {
         ///		@EntityName,
         ///		@State,
         ///		@SchemaHash
-        ///	)
-        ///END
-        ///ELSE
-        ///BEGIN
-        ///	UPDATE [DataverseToSql].[ManagedEntities]
-        ///	SET
-        ///		[State]  [rest of string was truncated]&quot;;.
+        ///	)        /// [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string DataverseToSql_ManagedEntities_Upsert_Proc {
             get {
@@ -287,7 +336,10 @@ namespace DataverseToSql.Core {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to CREATE SCHEMA [DataverseToSql];.
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
+        ///CREATE SCHEMA [DataverseToSql];.
         /// </summary>
         internal static string DataverseToSql_Schema {
             get {
@@ -296,13 +348,21 @@ namespace DataverseToSql.Core {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to CREATE TYPE [DataverseToSql].[EntityType]
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
+        ///CREATE TYPE [DataverseToSql].[EntityType]
         ///	FROM NVARCHAR(128);
         ///GO
         ///
         ///CREATE TYPE [DataverseToSql].[BlobNameType]
         ///	FROM NVARCHAR(722);
-        ///GO.
+        ///GO
+        ///
+        ///CREATE TYPE [DataverseToSql].[CustomScriptNameType]
+        ///	FROM NVARCHAR(512);
+        ///GO
+        ///.
         /// </summary>
         internal static string DataverseToSql_Types {
             get {
@@ -311,7 +371,10 @@ namespace DataverseToSql.Core {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to CREATE TABLE [$$SCHEMA$$].[GlobalOptionsetMetadata] (
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
+        ///CREATE TABLE [$$SCHEMA$$].[GlobalOptionsetMetadata] (
         ///	[OptionSetName] [varchar](128) NULL,
         ///	[Option] [bigint] NULL,
         ///	[IsUserLocalizedLabel] [varchar](6) NULL,
@@ -323,9 +386,7 @@ namespace DataverseToSql.Core {
         ///GO
         ///
         ///CREATE TYPE [DataverseToSql].[GlobalOptionsetMetadata_TableType] AS TABLE (
-        ///	[OptionSetName] [varchar](128) NULL,
-        ///	[Option] [bigint] NULL,
-        ///	[IsUserLocalizedLabel] [varch [rest of string was truncated]&quot;;.
+        ///	[OptionSetName] [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string Optionsets_GlobalOptionsetMetadata {
             get {
@@ -334,7 +395,10 @@ namespace DataverseToSql.Core {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to CREATE TABLE [$$SCHEMA$$].[OptionsetMetadata] (
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
+        ///CREATE TABLE [$$SCHEMA$$].[OptionsetMetadata] (
         ///	[EntityName] [varchar](128) NULL,
         ///	[OptionSetName] [varchar](128)  NULL,
         ///	[Option] [bigint] NULL,
@@ -346,10 +410,7 @@ namespace DataverseToSql.Core {
         ///
         ///CREATE TYPE [DataverseToSql].[OptionsetMetadata_TableType] AS TABLE (
         ///	[EntityName] [varchar](128) NULL,
-        ///	[OptionSetName] [varchar](128)  NULL,
-        ///	[Option] [bigint] NULL,
-        ///	[IsUserLocalizedLabel] [varchar](6) NULL,
-        ///	[Lo [rest of string was truncated]&quot;;.
+        ///	[OptionSetName] [varchar](128)  NU [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string Optionsets_OptionsetMetadata {
             get {
@@ -358,7 +419,10 @@ namespace DataverseToSql.Core {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to CREATE TABLE [$$SCHEMA$$].[StateMetadata] (
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
+        ///CREATE TABLE [$$SCHEMA$$].[StateMetadata] (
         ///	[EntityName] [varchar](128) NULL,
         ///	[State] [bigint] NULL,
         ///	[IsUserLocalizedLabel] [varchar](6) NULL,
@@ -371,12 +435,7 @@ namespace DataverseToSql.Core {
         ///	[EntityName] [varchar](128) NULL,
         ///	[State] [bigint] NULL,
         ///	[IsUserLocalizedLabel] [varchar](6) NULL,
-        ///	[LocalizedLabelLanguageCode] [bigint] NULL,
-        ///	[LocalizedLabel] [varchar](700) NULL
-        ///);
-        ///GO
-        ///
-        /// [rest of string was truncated]&quot;;.
+        ///	[LocalizedLabel [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string Optionsets_StateMetadata {
             get {
@@ -385,7 +444,10 @@ namespace DataverseToSql.Core {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to CREATE TABLE [$$SCHEMA$$].[StatusMetadata] (
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
+        ///CREATE TABLE [$$SCHEMA$$].[StatusMetadata] (
         ///	[EntityName] [varchar](128) NULL,
         ///	[State] [bigint] NULL,
         ///	[Status] [bigint] NULL,
@@ -399,8 +461,7 @@ namespace DataverseToSql.Core {
         ///	[EntityName] [varchar](128) NULL,
         ///	[State] [bigint] NULL,
         ///	[Status] [bigint] NULL,
-        ///	[IsUserLocalizedLabel] [varchar](6) NULL,
-        ///	[LocalizedLabelLanguageCode] [bigint] NU [rest of string was truncated]&quot;;.
+        ///	[IsUs [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string Optionsets_StatusMetadata {
             get {
@@ -409,7 +470,10 @@ namespace DataverseToSql.Core {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to CREATE TABLE [$$SCHEMA$$].[TargetMetadata] (
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
+        ///CREATE TABLE [$$SCHEMA$$].[TargetMetadata] (
         ///	[EntityName] [varchar](128) NULL,
         ///	[AttributeName] [varchar](128) NULL,
         ///	[ReferencedEntity] [varchar](128) NULL,
@@ -421,11 +485,7 @@ namespace DataverseToSql.Core {
         ///	[EntityName] [varchar](128) NULL,
         ///	[AttributeName] [varchar](128) NULL,
         ///	[ReferencedEntity] [varchar](128) NULL,
-        ///	[ReferencedAttribute] [varchar](128) NULL
-        ///);
-        ///GO
-        ///
-        ///CREATE PROCEDURE [DataverseToSql].[Merge_TargetMetadata] [rest of string was truncated]&quot;;.
+        ///	[ReferencedAttribute] [varchar [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string Optionsets_TargetMetadata {
             get {
