@@ -8,7 +8,6 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.SqlServer.TransactSql.ScriptDom;
 using System.Data;
-using System.Net;
 using Expression = Azure.Analytics.Synapse.Artifacts.Models.Expression;
 using ExpressionType = Azure.Analytics.Synapse.Artifacts.Models.ExpressionType;
 using SwitchCase = Azure.Analytics.Synapse.Artifacts.Models.SwitchCase;
@@ -356,6 +355,42 @@ namespace DataverseToSql.Core.Jobs
 
             pipeline.Activities.Add(lookupBlobsToIngestActivity);
 
+            // Activity: Lookup Blob Details
+            // Lookup activity that retrieves details about a blob to ingest
+            var lookupBlobsToIngestDetailsSource = new AzureSqlSource()
+            {
+                SqlReaderStoredProcedureName = "[DataverseToSql].[BlobsToIngest_GetDetails]",
+            };
+
+            lookupBlobsToIngestDetailsSource.StoredProcedureParameters["EntityName"] = new StoredProcedureParameter()
+            {
+                Type = StoredProcedureParameterType.String,
+                Value = new Expression(
+                    ExpressionType.Expression,
+                    "@item().EntityName")
+            };
+
+            lookupBlobsToIngestDetailsSource.StoredProcedureParameters["BlobName"] = new StoredProcedureParameter()
+            {
+                Type = StoredProcedureParameterType.String,
+                Value = new Expression(
+                    ExpressionType.Expression,
+                    "@item().BlobName")
+            };
+
+            var lookupBlobsToIngestDetailsDataset = new DatasetReference(
+                DatasetReferenceType.DatasetReference,
+                Naming.MetadataDatasetName());
+
+            var lookupBlobsToIngestDetailsActivity = new LookupActivity(
+                "Lookup Blob Details",
+                lookupBlobsToIngestDetailsSource,
+                lookupBlobsToIngestDetailsDataset)
+            {
+                FirstRowOnly = true
+            };
+
+
             // Activity: Full Load
             // Copy activity that performs the full load of a blob to Azure SQL Database.
 
@@ -365,7 +400,7 @@ namespace DataverseToSql.Core.Jobs
             {
                 SqlReaderQuery = new Expression(
                     ExpressionType.Expression,
-                    "@item().ServerlessQuery")
+                    "@activity('Lookup Blob Details').output.firstRow.ServerlessQuery")
             };
 
             // The sink is configured for insert and to use table lock.
@@ -391,10 +426,10 @@ namespace DataverseToSql.Core.Jobs
             // retrieved by the lookup activity
             fullLoadOutputReference.Parameters["Schema"] = new Expression(
                 ExpressionType.Expression,
-                "@item().TargetSchema");
+                "@activity('Lookup Blob Details').output.firstRow.TargetSchema");
             fullLoadOutputReference.Parameters["Table"] = new Expression(
                 ExpressionType.Expression,
-                "@item().TargetTable");
+                "@activity('Lookup Blob Details').output.firstRow.TargetTable");
 
             fullLoadActivity.Outputs.Add(fullLoadOutputReference);
 
@@ -407,7 +442,7 @@ namespace DataverseToSql.Core.Jobs
             {
                 SqlReaderQuery = new Expression(
                     ExpressionType.Expression,
-                    "@item().ServerlessQuery")
+                    "@activity('Lookup Blob Details').output.firstRow.ServerlessQuery")
             };
 
             // The sink is configured for upsert using a stored procedure.
@@ -443,10 +478,10 @@ namespace DataverseToSql.Core.Jobs
             // retrieved by the lookup activity
             incrementalOutputReference.Parameters["Schema"] = new Expression(
                 ExpressionType.Expression,
-                "@item().TargetSchema");
+                "@activity('Lookup Blob Details').output.firstRow.TargetSchema");
             incrementalOutputReference.Parameters["Table"] = new Expression(
                 ExpressionType.Expression,
-                "@item().TargetTable");
+                "@activity('Lookup Blob Details').output.firstRow.TargetTable");
 
             incrementalLoadActivity.Outputs.Add(incrementalOutputReference);
 
@@ -459,7 +494,7 @@ namespace DataverseToSql.Core.Jobs
 
             var switchLoadTypeActivity = new SwitchActivity(
                 "Switch load type",
-                new Expression(ExpressionType.Expression, "@string(item().LoadType)"));
+                new Expression(ExpressionType.Expression, "@string(activity('Lookup Blob Details').output.firstRow.LoadType)"));
 
             var fullLoadCase = new SwitchCase() { Value = "0", }; // full load
             fullLoadCase.Activities.Add(fullLoadActivity);
@@ -468,6 +503,11 @@ namespace DataverseToSql.Core.Jobs
             var incrementalLoadCase = new SwitchCase() { Value = "1" }; // incremental load
             incrementalLoadCase.Activities.Add(incrementalLoadActivity);
             switchLoadTypeActivity.Cases.Add(incrementalLoadCase);
+
+            switchLoadTypeActivity.DependsOn.Add(
+                new ActivityDependency(
+                    lookupBlobsToIngestDetailsActivity.Name,
+                    new List<DependencyCondition>() { new("Succeeded") }));
 
             // Activity: Mark blob complete
             // The activity marks a blob as complete after it has been loaded (either
@@ -516,6 +556,7 @@ namespace DataverseToSql.Core.Jobs
                 new Expression(ExpressionType.Expression, "@activity('Lookup blobs to ingest').output.value"),
                 new List<Activity>()
                 {
+                    lookupBlobsToIngestDetailsActivity,
                     switchLoadTypeActivity,
                     markBlobCompleteActivity
                 })
@@ -557,7 +598,7 @@ namespace DataverseToSql.Core.Jobs
             // The activity runs when either of the foreach activities (optionsets
             // and blobs to ingest) fails.
 
-            var failPipelineActivity = new FailActivity("Fail pipeline", "Pipeline failed", 1);
+            var failPipelineActivity = new FailActivity("Fail pipeline", "Pipeline failed", "1");
 
             failPipelineActivity.DependsOn.Add(
                 new ActivityDependency(

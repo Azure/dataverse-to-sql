@@ -5,11 +5,7 @@ CREATE PROCEDURE [DataverseToSql].[BlobsToIngest_Get]
 AS
 SELECT
 	[EntityName],
-	[BlobName],
-	[TargetSchema],
-	[TargetTable],
-	[ServerlessQuery],
-	[LoadType]
+	[BlobName]
 FROM
 	[DataverseToSql].[BlobsToIngest]
 WHERE

@@ -60,6 +60,7 @@ namespace DataverseToSql.Core
                     _model.AddObjects(SqlObjects.DataverseToSql_BlobsToIngest_Table);
                     _model.AddObjects(SqlObjects.DataverseToSql_BlobsToIngest_Insert_Proc);
                     _model.AddObjects(SqlObjects.DataverseToSql_BlobsToIngest_Get_Proc);
+                    _model.AddObjects(SqlObjects.DataverseToSql_BlobsToIngest_GetDetails_Proc);
                     _model.AddObjects(SqlObjects.DataverseToSql_BlobsToIngest_Complete_Proc);
 
                     _model.AddObjects(SqlObjects.DataverseToSql_FullLoad_Complete_Proc);
