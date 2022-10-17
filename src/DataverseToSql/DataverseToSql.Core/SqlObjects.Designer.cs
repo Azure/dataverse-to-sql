@@ -116,6 +116,33 @@ namespace DataverseToSql.Core {
         ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
         ///-- Licensed under the MIT License.
         ///
+        ///CREATE PROCEDURE [DataverseToSql].[BlobsToIngest_GetDetails]
+        ///	@EntityName [DataverseToSql].[EntityType],
+        ///	@BlobName [DataverseToSql].[BlobNameType]
+        ///AS
+        ///SELECT
+        ///	[TargetSchema],
+        ///	[TargetTable],
+        ///	[ServerlessQuery],
+        ///	[LoadType]
+        ///FROM
+        ///	[DataverseToSql].[BlobsToIngest]
+        ///WHERE
+        ///	[EntityName] = @EntityName
+        ///	AND [BlobName] = @BlobName
+        ///ORDER BY
+        ///	[BlobName].
+        /// </summary>
+        internal static string DataverseToSql_BlobsToIngest_GetDetails_Proc {
+            get {
+                return ResourceManager.GetString("DataverseToSql_BlobsToIngest_GetDetails_Proc", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
         ///CREATE PROCEDURE [DataverseToSql].[BlobsToIngest_Insert]
         ///	@EntityName [DataverseToSql].[EntityType],
         ///	@BlobName [DataverseToSql].[BlobNameType],
@@ -266,7 +293,7 @@ namespace DataverseToSql.Core {
         ///IF NOT EXISTS (
         ///	SELECT * FROM [DataverseToSql].[ManagedCustomScripts]
         ///	WHERE
-        ///		[ScriptName] = @EntityName
+        ///		[ScriptName] = @ScriptName
         ///)
         ///BEGIN
         ///	INSERT INTO [DataverseToSql].[ManagedCustomScripts](
