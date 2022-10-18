@@ -122,24 +122,31 @@ namespace DataverseToSql.Core
 
         // Return the Serverless SQL Pool query to read the specified blob during 
         // full load (used in initial load of new entities)
-        internal static string GetFullLoadServerlessQuery(this CdmEntity entity, Uri blobUri) =>
-            entity.IncrementalLoadServerlessQuery(blobUri) + "WHERE ISNULL(IsDelete, 'False') <> 'True'";
+        internal static string GetFullLoadServerlessQuery(
+            this CdmEntity entity, 
+            Uri blobUri, 
+            IList<(string name, string datatype)> targetColumns) =>
+            entity.IncrementalLoadServerlessQuery(blobUri, targetColumns) + "WHERE ISNULL(IsDelete, 'False') <> 'True'";
 
         // Return the Serverless SQL Pool query to read the specified blob during 
         // incremental load
-        internal static string IncrementalLoadServerlessQuery(this CdmEntity entity, Uri blobUri)
+        internal static string IncrementalLoadServerlessQuery(
+            this CdmEntity entity, 
+            Uri blobUri, 
+            IList<(string name, string datatype)> targetColumns)
         {
-            var columnList = string.Join(",", entity.Attributes.Select(attr => attr.SqlColumnDef()));
+            var sourceColumns = string.Join(",", entity.Attributes.Select(attr => attr.SqlColumnDef()));
             var primaryKeyCols = entity.PrimaryKeyAttributes.Select(a => a.SqlColumnName()).ToList();
             var primaryKeyString = string.Join(",", primaryKeyCols);
             var primaryKeyJoinPredicates = string.Join(" AND ", primaryKeyCols.Select(c => $"s.{c} = r.{c}"));
+            var targetColumnList = string.Join(",", targetColumns.Select(c => $"[{c.name}]"));
 
             return $@"
                 WITH cte_source AS (
                     SELECT  *
                     FROM    OPENROWSET(BULK ( N'{blobUri}' ),
                             FORMAT = 'csv', FIELDTERMINATOR  = ',', FIELDQUOTE = '""')
-                            WITH ({columnList}) AS T1
+                            WITH ({sourceColumns}) AS T1
                 ),
                 cte_rownumber AS (
                     SELECT  ROW_NUMBER() OVER (PARTITION BY {primaryKeyString} ORDER BY [SinkModifiedOn] DESC, [versionnumber] DESC) [DvRowNumber],
@@ -158,7 +165,7 @@ namespace DataverseToSql.Core
                     WHERE   r.DvRowNumber = 1
                 )
                 SELECT
-                    *
+                    {targetColumnList}
                 FROM
                     cte_most_recent_records
                 ";

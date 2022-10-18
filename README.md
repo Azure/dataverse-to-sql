@@ -322,25 +322,30 @@ Default template file:
   },
   "Ingestion": {
     "Parallelism": 1
+  },
+  "SchemaHandling": {
+    "EnableSchemaUpgradeForExistingTables": true
   }
+
 }
 ```
 
-| Section              | Setting        | Description                                                                          |
-|----------------------|----------------|--------------------------------------------------------------------------------------|
-| DataverseStorage     | StorageAccount | FQDN of the storage account containing Dataverse data.                               |
-| DataverseStorage     | Container      | Storage container containing Dataverse data (created by Synapse Link for Dataverse). |
-| IncrementalStorage   | StorageAccount | FQDN of the storage account containing incremental data.                             |
-| IncrementalStorage   | Container      | Storage container containing incremental data.                                       |
-| ConfigurationStorage | StorageAccount | FQDN of the storage account containing DataverseToSql configuration data.            |
-| ConfigurationStorage | Container      | Storage container containing DataverseToSql configuration data.                      |
-| Database             | Server         | FQDN of the Azure SQL Database.                                                      |
-| Database             | Database       | Name of the Azure SQL Database.                                                      |
-| Database             | Schema         | SQL Schema to be used for Dataverse tables.                                          |
-| SynapseWorkspace     | SubscriptionId | Subscription ID of the Synapse workspace.                                            |
-| SynapseWorkspace     | ResourceGroup  | Resource group of the Synapse workspace.                                             |
-| SynapseWorkspace     | Workspace      | Name of the Synapse workspace.                                                       |
-| Ingestion            | Parallelism    | Number of concurrent copy activities performed by the ingestion pipeline.            |
+| Section              | Setting                              | Default | Description                                                                          |
+|----------------------|--------------------------------------|---------|--------------------------------------------------------------------------------------|
+| DataverseStorage     | StorageAccount                       |         | FQDN of the storage account containing Dataverse data.                               |
+| DataverseStorage     | Container                            |         | Storage container containing Dataverse data (created by Synapse Link for Dataverse). |
+| IncrementalStorage   | StorageAccount                       |         | FQDN of the storage account containing incremental data.                             |
+| IncrementalStorage   | Container                            |         | Storage container containing incremental data.                                       |
+| ConfigurationStorage | StorageAccount                       |         | FQDN of the storage account containing DataverseToSql configuration data.            |
+| ConfigurationStorage | Container                            |         | Storage container containing DataverseToSql configuration data.                      |
+| Database             | Server                               |         | FQDN of the Azure SQL Database.                                                      |
+| Database             | Database                             |         | Name of the Azure SQL Database.                                                      |
+| Database             | Schema                               |         | SQL Schema to be used for Dataverse tables.                                          |
+| SynapseWorkspace     | SubscriptionId                       |         | Subscription ID of the Synapse workspace.                                            |
+| SynapseWorkspace     | ResourceGroup                        |         | Resource group of the Synapse workspace.                                             |
+| SynapseWorkspace     | Workspace                            |         | Name of the Synapse workspace.                                                       |
+| Ingestion            | Parallelism                          | 1       | Number of concurrent copy activities performed by the ingestion pipeline.            |
+| SchemaHandling       | EnableSchemaUpgradeForExistingTables | true    | Enable the propagation of schema changes for existing tables.                        |
 
 ### Provide scripts for custom SQL objects
 
