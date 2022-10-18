@@ -72,6 +72,9 @@ namespace DataverseToSql.Core.Jobs
                     CancellationToken = cancellationToken
                 };
 
+                // pre-load CDM entities
+                await environment.GetCdmEntityDictAsync(cancellationToken);
+
                 await Parallel.ForEachAsync(
                     await environment.GetManagedEntitiesAsync(cancellationToken),
                     parallelOps,
@@ -111,11 +114,17 @@ namespace DataverseToSql.Core.Jobs
         private async Task ProcessSchemaChanges(CancellationToken cancellationToken)
         {
             // Check if there is any new entity that must be created
-            // or any existing entity whose schema changed since last deployment
-            if ((await environment.GetManagedEntitiesAsync(cancellationToken))
-                .Where(e => e.State == ManagedEntityState.New).Any()
-                || await HasAnyCustomScriptChangedAsync(cancellationToken)
-                || await HasAnySchemaChangedAsync(cancellationToken))
+            // or any existing entity whose schema changed since last deployment.
+            // Check for EnableSchemaUpgradeForExistingTables setting; if disabled
+            // do not take existing tables into consideration.
+            if (    // Any new entities?
+                    (await environment.GetManagedEntitiesAsync(cancellationToken))
+                    .Where(e => e.State == ManagedEntityState.New).Any()
+                    // Any changed/new custom script?
+                    || await HasAnyCustomScriptChangedAsync(cancellationToken)
+                    // Any existing entity changed?
+                    || (environment.Config.SchemaHandling.EnableSchemaUpgradeForExistingTables
+                        && await HasAnyExistingSchemaChangedAsync(cancellationToken)))
             {
                 log.LogInformation("Detected schema changes.");
                 await DeploySqlSchemaAsync(cancellationToken);
@@ -137,9 +146,11 @@ namespace DataverseToSql.Core.Jobs
         }
 
         // Compare the hash of the schema of each entity with what previously stored
-        private async Task<bool> HasAnySchemaChangedAsync(CancellationToken cancellationToken)
+        private async Task<bool> HasAnyExistingSchemaChangedAsync(CancellationToken cancellationToken)
         {
-            foreach (var managedEntity in await environment.GetManagedEntitiesAsync(cancellationToken))
+            // Check only existing (non-new) entities
+            foreach (var managedEntity in (await environment.GetManagedEntitiesAsync(cancellationToken))
+                .Where(e => e.State == ManagedEntityState.Ready))
             {
                 var (found, cdmEntity) = await environment.TryGetCdmEntityAsync(managedEntity, cancellationToken);
                 if (found && cdmEntity is not null)
@@ -159,8 +170,11 @@ namespace DataverseToSql.Core.Jobs
             log.LogInformation("Generating database model.");
 
             // Add the scripts to generate objects belonging to each entity
+            // Consider only new entities if the EnableSchemaUpgradeForExistingTables is disabled
             var scriptedManagedEntities = new List<ManagedEntity>();
-            foreach (var managedEntity in await environment.GetManagedEntitiesAsync(cancellationToken))
+            foreach (var managedEntity in (await environment.GetManagedEntitiesAsync(cancellationToken))
+                .Where(e => environment.Config.SchemaHandling.EnableSchemaUpgradeForExistingTables
+                || e.State == ManagedEntityState.New))
             {
                 var (found, cdmEntity) = await environment.TryGetCdmEntityAsync(managedEntity, cancellationToken);
                 if (found && cdmEntity is not null)
@@ -217,6 +231,18 @@ namespace DataverseToSql.Core.Jobs
                 return;
             }
 
+            var targetColumns = await environment.database.GetTableColumnsAsync(
+                schema: environment.Config.Database.Schema,
+                name: managedEntity.Name,
+                cancellationToken: cancellationToken);
+
+            if (targetColumns.Count == 0)
+            {
+                log.LogError("Could not retrieve column definition from database for entity {entity}.",
+                    managedEntity.Name);
+                return;
+            }
+
             // Process each entity's partition individually
             var partitionCount = 0;
             foreach (var partition in cdmEntity.Partitions)
@@ -239,7 +265,7 @@ namespace DataverseToSql.Core.Jobs
 
                 // Generate the query to run in Serverless SQL pool to read
                 // and deduplicate the partition
-                string serverlessQuery = cdmEntity.GetFullLoadServerlessQuery(partitionUri);
+                string serverlessQuery = cdmEntity.GetFullLoadServerlessQuery(partitionUri, targetColumns);
 
                 // Record the metadata of the blob for ingestion
                 var blobToIngest = new BlobToIngest(
@@ -278,6 +304,18 @@ namespace DataverseToSql.Core.Jobs
             await ProcessNewPartitions(managedEntity, managedBlobs, cancellationToken);
 
             log.LogInformation("Entity {entity}: performing incremental load.", managedEntity.Name);
+
+            var targetColumns = await environment.database.GetTableColumnsAsync(
+                schema: environment.Config.Database.Schema,
+                name: managedEntity.Name,
+                cancellationToken: cancellationToken);
+
+            if (targetColumns.Count == 0)
+            {
+                log.LogError("Could not retrieve column definition from database for entity {entity}.",
+                    managedEntity.Name);
+                return;
+            }
 
             var newData = false;
 
@@ -340,7 +378,7 @@ namespace DataverseToSql.Core.Jobs
 
                     // Generate the query to run in Serverless SQL pool to read
                     // and deduplicate the new data
-                    var serverlessQuery = cdmEntity.IncrementalLoadServerlessQuery(targetBlobUri);
+                    var serverlessQuery = cdmEntity.IncrementalLoadServerlessQuery(targetBlobUri, targetColumns);
 
                     // Record the metadata of the blob for ingestion
                     await environment.database.InsertAsync(new BlobToIngest(

@@ -459,5 +459,32 @@ namespace DataverseToSql.Core
 
             return result;
         }
+
+        internal async Task<IList<(string name, string datatype)>> GetTableColumnsAsync(
+            string schema, 
+            string name, 
+            CancellationToken cancellationToken)
+        {
+            var conn = await GetSqlConnectionAsync(cancellationToken);
+            var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT [name], [system_type_name] FROM " +
+                $"sys.dm_exec_describe_first_result_set('SELECT TOP 1 * FROM [{schema}].[{name}]', NULL, 0);";
+
+            var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+
+            var result = new List<(string name, string datatype)>();
+
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                result.Add((
+                    reader.GetString(0),    // column name
+                    reader.GetString(1)));  // column datatype
+            }
+
+            reader.Close();
+            conn.Close();
+
+            return result;
+        }
     }
 }

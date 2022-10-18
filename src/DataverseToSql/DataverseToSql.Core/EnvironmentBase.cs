@@ -86,7 +86,7 @@ namespace DataverseToSql.Core
         // Initialize the dictionary of CDM entities.
         // The dictionary contains only entities with
         // "Completed" InitialSyncState.
-        private async Task<IDictionary<string, CdmEntity>> InitCdmEntitiesDictAsync(CancellationToken cancellationToken)
+        internal async Task<IDictionary<string, CdmEntity>> InitCdmEntitiesDictAsync(CancellationToken cancellationToken)
         {
             log.LogInformation("Loading CDM entities.");
 

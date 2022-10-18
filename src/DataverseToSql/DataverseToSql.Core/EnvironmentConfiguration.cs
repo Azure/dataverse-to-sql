@@ -84,6 +84,8 @@ namespace DataverseToSql.Core
         // Configuration of the ingestion process
         public IngestionConfiguration Ingestion { get; set; } = new();
 
+        public SchemaHandlingConfiguration SchemaHandling { get; set; } = new();
+
         // Fill the configuration with placeholder values.
         // Useful to generate a template.
         internal void FillTemplateValues()
@@ -93,6 +95,7 @@ namespace DataverseToSql.Core
             ConfigurationStorage.FillTemplateValues();
             Database.FillTemplateValues();
             SynapseWorkspace.FillTemplateValues();
+            SchemaHandling.FillTemplateValues();
         }
     }
 
@@ -175,6 +178,16 @@ namespace DataverseToSql.Core
             SubscriptionId = "<Subscription ID of the Synapse workspace>";
             ResourceGroup = "<Resource Group of the Synapse workspace>";
             Workspace = "<Name of the Synapse workspace>";
+        }
+    }
+
+    public class SchemaHandlingConfiguration
+    {
+        public bool EnableSchemaUpgradeForExistingTables { get; set; } = true;
+
+        internal void FillTemplateValues()
+        {
+            EnableSchemaUpgradeForExistingTables = true;
         }
     }
 }
