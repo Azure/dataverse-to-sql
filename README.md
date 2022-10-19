@@ -428,6 +428,16 @@ Example:
 dv2sql -p ./dataverse-to-sql add --all
 ```
 
+## Upgrade
+
+To upgrade the tool to a new version do the following.
+
+1. Build the CLI and function.
+2. Disable the function.
+3. Run `dv2sql deploy`. See [Deploy the environment](#deploy-the-environment).
+4. Deploy the function.
+5. Enable the function.
+
 ## Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
