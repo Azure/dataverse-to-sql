@@ -35,6 +35,8 @@ namespace DataverseToSql.Core.Jobs
 
         public void Run()
         {
+            ValidateConfiguration();
+
             log.LogInformation("Starting deployment.");
 
             // Deploy the core metadata schema to the database
@@ -55,6 +57,16 @@ namespace DataverseToSql.Core.Jobs
             UploadCustomSqlObjects();
 
             log.LogInformation("Successfully completed deployment.");
+        }
+
+        private void ValidateConfiguration()
+        {
+            if (environment.Config.DataverseStorage.StorageAccount != environment.Config.IncrementalStorage.StorageAccount)
+            {
+                var ex = new Exception("The storage account of the DataverseStorage and IncrementalStorage must be the same.");
+                log.LogError(ex, ex.Message);
+                throw ex;
+            }
         }
 
         // Create the Synapse linked services required by the ingeston pipeline.

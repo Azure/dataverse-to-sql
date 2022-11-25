@@ -103,6 +103,8 @@ Setup Synapse Link for Dataverse to replicate tables to the Azure storage accoun
 
 **Important:** The tables must be configured in append-only mode. See [Advanced Configuration Options in Azure Synapse Link](https://learn.microsoft.com/en-us/power-apps/maker/data-platform/azure-synapse-link-advanced-configuration) for more details.
 
+**NOTE:** The storage account must be the same of the container for incremental data..
+
 To setup Synapse Link for Dataverse connected to Azure Synapse, follow [Create an Azure Synapse Link for Dataverse with your Azure Synapse Workspace](https://learn.microsoft.com/en-us/power-apps/maker/data-platform/azure-synapse-link-synapse).
 
 To setup Synapse Link for Dataverse connected to the storage account only, follow [Create an Azure Synapse Link for Dataverse with Azure Data Lake](https://learn.microsoft.com/en-us/power-apps/maker/data-platform/azure-synapse-link-data-lake).
@@ -233,7 +235,7 @@ You can override the authentication process to specify other credentials using t
 - Two containers have been created inside the storage account to store incremental blobs and DataverseToSql configuration files, respectively.
 - An Azure Synapse workspace has been deployed.
 - The Synapse workspace has been assigned Storage Blob Data Contributor role on the storage account.
-- A link is established between Dataverse and the Azure storage account using Synapse Link for Dataverse.
+- A link is established between Dataverse and the Azure storage account using Synapse Link for Dataverse. **Note** The storage account must be the same of the container used to store incremental blobs.
 - _(Optionally)_ Synapse link for Dataverse is configured to connect to the Azure Synapse workspace.
 - Dataverse tables are replicated to Azure Storage in append-only mode.
 - An Azure SQL Database (single database) has been deployed.
