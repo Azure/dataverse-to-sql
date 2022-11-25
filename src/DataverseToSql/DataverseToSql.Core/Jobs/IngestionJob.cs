@@ -8,7 +8,6 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 using BlockBlobClientCopyRangeExtension;
 using DataverseToSql.Core.Model;
-using Microsoft.Azure.Management.Synapse.Models;
 using Microsoft.Extensions.Logging;
 
 namespace DataverseToSql.Core.Jobs
@@ -251,8 +250,20 @@ namespace DataverseToSql.Core.Jobs
 
                 partitionCount++;
 
-                var partitionUri = new Uri(partition.Location);
-                var blobClient = new BlobClient(partitionUri, environment.Credential);
+                var sourcePartitionUri = new BlobUriBuilder(environment.Config.DataverseStorage.ContainerUri())
+                { 
+                    BlobName = $"{managedEntity.Name}/{partition.Name}.csv"
+                }.ToUri();
+
+                var targetPartitionUri = new BlobUriBuilder(environment.Config.IncrementalStorage.ContainerUri())
+                {
+                    BlobName = $"{managedEntity.Name}/{partition.Name}_{ingestionTimestamp}.csv"
+                }.ToUri();
+
+                // Copy the current partition data to the incremental storage
+                await CopyBlob(sourcePartitionUri, targetPartitionUri, cancellationToken);
+
+                var blobClient = new BlobClient(targetPartitionUri, environment.Credential);
 
                 // Record the size of the partition into the ManagedBlobs table
                 // as the starting offset of later incremental ingestion
@@ -265,7 +276,7 @@ namespace DataverseToSql.Core.Jobs
 
                 // Generate the query to run in Serverless SQL pool to read
                 // and deduplicate the partition
-                string serverlessQuery = cdmEntity.GetFullLoadServerlessQuery(partitionUri, targetColumns);
+                string serverlessQuery = cdmEntity.GetFullLoadServerlessQuery(targetPartitionUri, targetColumns);
 
                 // Record the metadata of the blob for ingestion
                 var blobToIngest = new BlobToIngest(
@@ -285,6 +296,42 @@ namespace DataverseToSql.Core.Jobs
             else
             {
                 log.LogInformation("Entity {entity}: no partition exists yet for initial ingestion.", managedEntity.Name);
+            }
+        }
+
+        // Copy blob with retry logic when changes are detected
+        private async Task CopyBlob(Uri sourceBlob, Uri targetBlob, CancellationToken cancellationToken)
+        {
+            log.LogInformation("Copying {sourceBlob} to {targetBlob}", sourceBlob, targetBlob);
+
+            var retryCount = 0;
+            var blockClient = new BlobClient(targetBlob, environment.Credential);
+
+            while (true)
+            {
+                try
+                {
+                    var copy = await blockClient.StartCopyFromUriAsync(sourceBlob, cancellationToken: cancellationToken);
+                    await copy.WaitForCompletionAsync(cancellationToken);
+                    return;
+                }
+                catch (RequestFailedException ex)
+                {
+                    if (ex.ErrorCode != "BlobModifiedWhileReading")
+                        throw;
+
+                    var retryIntervalMs = 1000 << retryCount++;
+
+                    log.LogWarning(
+                        "Skipping modified blob {sourceBlob}, waiting {retryIntervalMs} ms.",
+                        sourceBlob,
+                        retryIntervalMs);
+
+                    Thread.Sleep(retryIntervalMs);
+
+                    if (retryCount >= 5)
+                        throw;
+                }
             }
         }
 
