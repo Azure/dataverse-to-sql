@@ -16,6 +16,7 @@ namespace DataverseToSql.Core.CdmModel
         internal readonly int MaxLength;
         internal readonly int Precision = -1;
         internal readonly int Scale = -1;
+        internal string? CustomSqlDatatype = null;
 
         internal CdmAttribute(dynamic attribute)
         {

@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using Azure.Analytics.Synapse.Artifacts.Models;
 using Azure.Core;
 using Azure.Storage.Blobs;
 using DataverseToSql.Core.CdmModel;
@@ -8,6 +9,7 @@ using DataverseToSql.Core.Model;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using System.Collections.Concurrent;
+using System.Windows.Markup;
 
 namespace DataverseToSql.Core
 {
@@ -33,6 +35,7 @@ namespace DataverseToSql.Core
         private IDictionary<string, ManagedEntity>? _managedEntityDict = null;
         private IList<(string name, string script)>? _customScripts = null;
         private Dictionary<string, ManagedCustomScript>? _managedCustomScriptsDict = null;
+        private Dictionary<string, HashSet<string>>? _optionSets;
 
         public EnvironmentBase(
             ILogger log,
@@ -104,6 +107,9 @@ namespace DataverseToSql.Core
                 CancellationToken = cancellationToken
             };
 
+            // force loading optionset data
+            await GetOptionSetAsync(cancellationToken);
+
             await Parallel.ForEachAsync(await GetCdmEntityModelBlobNamesAsync(cancellationToken),
                 parallelOpts,
                 async (blobName, ct) =>
@@ -130,6 +136,8 @@ namespace DataverseToSql.Core
                             // Add only entities whose InitialSyncState is "Completed"
                             if (cdmEntity.InitialSyncState == "Completed")
                             {
+                                await OverrideDatatypes(cdmEntity, cancellationToken);
+
                                 dict[cdmEntity.Name.ToLower()] = cdmEntity;
                             }
                         }
@@ -146,6 +154,100 @@ namespace DataverseToSql.Core
                 });
 
             return dict;
+        }
+
+        // Override the datatype of an entity attributes if necessary
+        // e.g. when wanting to use int instead of bigint for optionsets.
+        private async Task OverrideDatatypes(CdmEntity cdmEntity, CancellationToken cancellationToken)
+        {
+            // if OptionSetInt32 is true, override the SQL data type
+            // of int64 optionset fields to int, instead of bigint
+            if (Config.SchemaHandling.OptionSetInt32)
+            {
+                var optionSets = await GetOptionSetAsync(cancellationToken);
+
+                var entityName = cdmEntity.Name.ToLower();
+                foreach (var attribute in cdmEntity.Attributes)
+                {
+                    var attributeName = attribute.Name.ToLower();
+
+                    if ((attributeName == "statecode"
+                        || attributeName == "statuscode"
+                        || (optionSets.ContainsKey(entityName) && optionSets[entityName].Contains(attributeName)))
+                        && attribute.DataType.ToLower() == "int64")
+                    {
+                        attribute.CustomSqlDatatype = "int";
+                    }
+                }
+            }
+        }
+
+        private async Task<Dictionary<string, HashSet<string>>> GetOptionSetAsync(CancellationToken cancellationToken)
+        {
+            if (_optionSets is null)
+            {
+                _optionSets = new();
+
+                var uriBuilder = new BlobUriBuilder(Config.DataverseStorage.ContainerUri())
+                {
+                    BlobName = "OptionsetMetadata/GlobalOptionsetMetadata.csv"
+                };
+
+                var blobUri = uriBuilder.ToUri();
+
+                var blobClient = new BlobClient(
+                    blobUri,
+                    Credential);
+
+                using var globalOptionSetMetadatareader = new StreamReader(await blobClient.OpenReadAsync(default, cancellationToken));
+                while (true)
+                {
+                    var line = await globalOptionSetMetadatareader.ReadLineAsync();
+                    if (line is null) break;
+
+                    var globalOptionSetFields = line.Split(',');
+                    var table = globalOptionSetFields[6].ToLower();
+                    var field = globalOptionSetFields[0].ToLower();
+
+                    if (!_optionSets.ContainsKey(table))
+                    {
+                        _optionSets[table] = new();
+                    }
+
+                    _optionSets[table].Add(field);
+                }
+
+                uriBuilder = new BlobUriBuilder(Config.DataverseStorage.ContainerUri())
+                {
+                    BlobName = "OptionsetMetadata/OptionsetMetadata.csv"
+                };
+
+                blobUri = uriBuilder.ToUri();
+
+                blobClient = new BlobClient(
+                    blobUri,
+                    Credential);
+
+                using var optionSetMetadatareader = new StreamReader(await blobClient.OpenReadAsync(default, cancellationToken));
+                while (true)
+                {
+                    var line = await optionSetMetadatareader.ReadLineAsync();
+                    if (line is null) break;
+
+                    var globalOptionSetFields = line.Split(',');
+                    var table = globalOptionSetFields[0].ToLower();
+                    var field = globalOptionSetFields[1].ToLower();
+
+                    if (!_optionSets.ContainsKey(table))
+                    {
+                        _optionSets[table] = new();
+                    }
+
+                    _optionSets[table].Add(field);
+                }
+            }
+
+            return _optionSets;
         }
 
         // Dictionary of managed entities indexed by name (lowercase).

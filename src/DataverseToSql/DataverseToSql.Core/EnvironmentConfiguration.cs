@@ -184,6 +184,7 @@ namespace DataverseToSql.Core
     public class SchemaHandlingConfiguration
     {
         public bool EnableSchemaUpgradeForExistingTables { get; set; } = true;
+        public bool OptionSetInt32 { get; set; } = false;
 
         internal void FillTemplateValues()
         {

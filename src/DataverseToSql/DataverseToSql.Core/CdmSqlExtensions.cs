@@ -182,7 +182,7 @@ namespace DataverseToSql.Core
         // Return the SQL data type of the CDM attribute
         internal static string SqlDataType(this CdmAttribute attr)
         {
-            return attr.DataType.ToLower() switch
+            return attr.CustomSqlDatatype ?? attr.DataType.ToLower() switch
             {
                 "binary" => "varbinary(max)",
                 "boolean" => "bit",
