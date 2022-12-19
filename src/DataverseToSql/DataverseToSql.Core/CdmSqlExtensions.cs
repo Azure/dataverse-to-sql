@@ -123,19 +123,19 @@ namespace DataverseToSql.Core
         // Return the Serverless SQL Pool query to read the specified blob during 
         // full load (used in initial load of new entities)
         internal static string GetFullLoadServerlessQuery(
-            this CdmEntity entity, 
-            Uri blobUri, 
+            this CdmEntity entity,
+            Uri blobUri,
             IList<(string name, string datatype)> targetColumns) =>
             entity.IncrementalLoadServerlessQuery(blobUri, targetColumns) + "WHERE ISNULL(IsDelete, 'False') <> 'True'";
 
         // Return the Serverless SQL Pool query to read the specified blob during 
         // incremental load
         internal static string IncrementalLoadServerlessQuery(
-            this CdmEntity entity, 
-            Uri blobUri, 
+            this CdmEntity entity,
+            Uri blobUri,
             IList<(string name, string datatype)> targetColumns)
         {
-            var sourceColumns = string.Join(",", entity.Attributes.Select(attr => attr.SqlColumnDef()));
+            var sourceColumns = string.Join(",", entity.Attributes.Select(attr => attr.SqlColumnDef(serverless: true)));
             var primaryKeyCols = entity.PrimaryKeyAttributes.Select(a => a.SqlColumnName()).ToList();
             var primaryKeyString = string.Join(",", primaryKeyCols);
             var primaryKeyJoinPredicates = string.Join(" AND ", primaryKeyCols.Select(c => $"s.{c} = r.{c}"));
@@ -173,16 +173,20 @@ namespace DataverseToSql.Core
 
         // Return the SQL column definition of the CDM attribute
         // in the format [<column name>] [<data type>]
-        internal static string SqlColumnDef(this CdmAttribute attr) => $"{attr.SqlColumnName()} {attr.SqlDataType()}";
+        internal static string SqlColumnDef(this CdmAttribute attr, bool serverless = false)
+            => $"{attr.SqlColumnName()} {attr.SqlDataType(serverless)}";
 
         // Return the formated SQL column name of the CDM attribute
         // in the format [<column name>]
         internal static string SqlColumnName(this CdmAttribute attr) => $"[{attr.Name}]";
 
         // Return the SQL data type of the CDM attribute
-        internal static string SqlDataType(this CdmAttribute attr)
+        internal static string SqlDataType(this CdmAttribute attr, bool serverless = false)
         {
-            return attr.CustomSqlDatatype ?? attr.DataType.ToLower() switch
+            if (!serverless && attr.CustomSqlDatatype is not null)
+                return attr.CustomSqlDatatype;
+
+            return attr.DataType.ToLower() switch
             {
                 "binary" => "varbinary(max)",
                 "boolean" => "bit",

@@ -2,7 +2,9 @@
 // Licensed under the MIT License.
 
 using Azure.Core;
+using Azure.Storage.Blobs;
 using Microsoft.Extensions.Logging;
+using Microsoft.SqlServer.TransactSql.ScriptDom;
 using Newtonsoft.Json;
 
 namespace DataverseToSql.Core
@@ -120,6 +122,18 @@ namespace DataverseToSql.Core
         internal override Task<IList<(string name, string script)>> InitCustomScriptsAsync(CancellationToken cancellationToken)
         {
             throw new NotImplementedException();
+        }
+
+        internal override async Task<TextReader?> GetCustomDatatypeMapReader(CancellationToken cancellationToken)
+        {
+            var customDatatypeMapPath = Path.Join(LocalPath, CUSTOM_DATATYPE_MAP);
+
+            if (!File.Exists(customDatatypeMapPath))
+                return null;
+
+            log.LogInformation("Loading custom data type map from {path}.", customDatatypeMapPath);
+
+            return new StreamReader(new FileStream(customDatatypeMapPath, FileMode.Open));
         }
     }
 }
