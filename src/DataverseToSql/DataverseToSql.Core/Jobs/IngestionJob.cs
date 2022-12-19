@@ -154,7 +154,8 @@ namespace DataverseToSql.Core.Jobs
                 var (found, cdmEntity) = await environment.TryGetCdmEntityAsync(managedEntity, cancellationToken);
                 if (found && cdmEntity is not null)
                 {
-                    var entityScripts = cdmEntity.SqlScripts(environment.Config.Database.Schema);
+                    var entityScripts = cdmEntity.SqlScripts(environment.Config.Database.Schema
+                        , environment.Config.SchemaHandling.SkipIsDeleteColumn);
                     if (managedEntity.SchemaHash != entityScripts.Sha1())
                         return true;
                 }
@@ -178,9 +179,11 @@ namespace DataverseToSql.Core.Jobs
                 var (found, cdmEntity) = await environment.TryGetCdmEntityAsync(managedEntity, cancellationToken);
                 if (found && cdmEntity is not null)
                 {
-                    if (managedEntity.SchemaHash != cdmEntity.SqlScripts(environment.Config.Database.Schema))
+                    if (managedEntity.SchemaHash != cdmEntity.SqlScripts(environment.Config.Database.Schema,
+                        environment.Config.SchemaHandling.SkipIsDeleteColumn))
                     {
-                        var entitySqlScripts = cdmEntity.SqlScripts(environment.Config.Database.Schema);
+                        var entitySqlScripts = cdmEntity.SqlScripts(environment.Config.Database.Schema,
+                            environment.Config.SchemaHandling.SkipIsDeleteColumn);
                         managedEntity.SchemaHash = entitySqlScripts.Sha1();
                         scriptedManagedEntities.Add(managedEntity);
                         environment.database.AddObjects(entitySqlScripts);
@@ -230,9 +233,8 @@ namespace DataverseToSql.Core.Jobs
                 return;
             }
 
-            var targetColumns = await environment.database.GetTableColumnsAsync(
-                schema: environment.Config.Database.Schema,
-                name: managedEntity.Name,
+            var targetColumns = await environment.database.GetTableTypeColumnsAsync(
+                tableName: managedEntity.Name,
                 cancellationToken: cancellationToken);
 
             if (targetColumns.Count == 0)
@@ -251,7 +253,7 @@ namespace DataverseToSql.Core.Jobs
                 partitionCount++;
 
                 var sourcePartitionUri = new BlobUriBuilder(environment.Config.DataverseStorage.ContainerUri())
-                { 
+                {
                     BlobName = $"{managedEntity.Name}/{partition.Name}.csv"
                 }.ToUri();
 
@@ -276,7 +278,11 @@ namespace DataverseToSql.Core.Jobs
 
                 // Generate the query to run in Serverless SQL pool to read
                 // and deduplicate the partition
-                string serverlessQuery = cdmEntity.GetFullLoadServerlessQuery(targetPartitionUri, targetColumns);
+                string serverlessQuery = cdmEntity.GetFullLoadServerlessQuery(
+                    targetPartitionUri,
+                    targetColumns
+                        .Where(c => !environment.Config.SchemaHandling.SkipIsDeleteColumn || c.ToLower() != "isdelete")
+                        .ToList());
 
                 // Record the metadata of the blob for ingestion
                 var blobToIngest = new BlobToIngest(
@@ -352,9 +358,8 @@ namespace DataverseToSql.Core.Jobs
 
             log.LogInformation("Entity {entity}: performing incremental load.", managedEntity.Name);
 
-            var targetColumns = await environment.database.GetTableColumnsAsync(
-                schema: environment.Config.Database.Schema,
-                name: managedEntity.Name,
+            var targetColumns = await environment.database.GetTableTypeColumnsAsync(
+                tableName: managedEntity.Name,
                 cancellationToken: cancellationToken);
 
             if (targetColumns.Count == 0)

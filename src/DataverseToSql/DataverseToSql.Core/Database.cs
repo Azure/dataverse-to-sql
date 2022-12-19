@@ -460,25 +460,27 @@ namespace DataverseToSql.Core
             return result;
         }
 
-        internal async Task<IList<(string name, string datatype)>> GetTableColumnsAsync(
-            string schema, 
-            string name, 
+        internal async Task<List<string>> GetTableTypeColumnsAsync(
+            string tableName, 
             CancellationToken cancellationToken)
         {
             var conn = await GetSqlConnectionAsync(cancellationToken);
+            
             var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT [name], [system_type_name] FROM " +
-                $"sys.dm_exec_describe_first_result_set('SELECT TOP 1 * FROM [{schema}].[{name}]', NULL, 0);";
+            cmd.CommandText = "SELECT c.[name] FROM sys.columns c " +
+                "INNER JOIN sys.table_types tt ON c.object_id = tt.type_table_object_id " +
+                "WHERE tt.name = @TableTypeName AND SCHEMA_NAME(tt.[schema_id]) = N'DataverseToSql' " +
+                "ORDER BY column_id";
+
+            cmd.Parameters.Add("@TableTypeName", SqlDbType.NVarChar).Value = $"{tableName}_TableType";
 
             var reader = await cmd.ExecuteReaderAsync(cancellationToken);
 
-            var result = new List<(string name, string datatype)>();
+            var result = new List<string>();
 
             while (await reader.ReadAsync(cancellationToken))
             {
-                result.Add((
-                    reader.GetString(0),    // column name
-                    reader.GetString(1)));  // column datatype
+                result.Add(reader.GetString(0));
             }
 
             reader.Close();

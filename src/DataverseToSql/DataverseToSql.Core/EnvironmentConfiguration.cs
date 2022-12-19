@@ -186,6 +186,8 @@ namespace DataverseToSql.Core
         public bool EnableSchemaUpgradeForExistingTables { get; set; } = true;
         public bool OptionSetInt32 { get; set; } = false;
 
+        public bool SkipIsDeleteColumn { get; set; } = false;
+
         internal void FillTemplateValues()
         {
             EnableSchemaUpgradeForExistingTables = true;
