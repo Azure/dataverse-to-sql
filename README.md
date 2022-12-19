@@ -332,23 +332,127 @@ Default template file:
 }
 ```
 
-| Section              | Setting                              | Default | Description                                                                          |
-|----------------------|--------------------------------------|---------|--------------------------------------------------------------------------------------|
-| DataverseStorage     | StorageAccount                       |         | FQDN of the storage account containing Dataverse data.                               |
-| DataverseStorage     | Container                            |         | Storage container containing Dataverse data (created by Synapse Link for Dataverse). |
-| IncrementalStorage   | StorageAccount                       |         | FQDN of the storage account containing incremental data.                             |
-| IncrementalStorage   | Container                            |         | Storage container containing incremental data.                                       |
-| ConfigurationStorage | StorageAccount                       |         | FQDN of the storage account containing DataverseToSql configuration data.            |
-| ConfigurationStorage | Container                            |         | Storage container containing DataverseToSql configuration data.                      |
-| Database             | Server                               |         | FQDN of the Azure SQL Database.                                                      |
-| Database             | Database                             |         | Name of the Azure SQL Database.                                                      |
-| Database             | Schema                               |         | SQL Schema to be used for Dataverse tables.                                          |
-| SynapseWorkspace     | SubscriptionId                       |         | Subscription ID of the Synapse workspace.                                            |
-| SynapseWorkspace     | ResourceGroup                        |         | Resource group of the Synapse workspace.                                             |
-| SynapseWorkspace     | Workspace                            |         | Name of the Synapse workspace.                                                       |
-| Ingestion            | Parallelism                          | 1       | Number of concurrent copy activities performed by the ingestion pipeline.            |
-| SchemaHandling       | EnableSchemaUpgradeForExistingTables | true    | Enable the propagation of schema changes for existing tables.                        |
-| SchemaHandling       | OptionSetInt32                       | false   | Use int instead of long for integer OptionSet fields. **Note**: once set to true, the option cannot be to false; all tables must be removed and redeployed.                               |
+| Section              | Setting                              | Default | Description                                                                                                                                                 |
+|----------------------|--------------------------------------|---------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| DataverseStorage     | StorageAccount                       |         | FQDN of the storage account containing Dataverse data.                                                                                                      |
+| DataverseStorage     | Container                            |         | Storage container containing Dataverse data (created by Synapse Link for Dataverse).                                                                        |
+| IncrementalStorage   | StorageAccount                       |         | FQDN of the storage account containing incremental data.                                                                                                    |
+| IncrementalStorage   | Container                            |         | Storage container containing incremental data.                                                                                                              |
+| ConfigurationStorage | StorageAccount                       |         | FQDN of the storage account containing DataverseToSql configuration data.                                                                                   |
+| ConfigurationStorage | Container                            |         | Storage container containing DataverseToSql configuration data.                                                                                             |
+| Database             | Server                               |         | FQDN of the Azure SQL Database.                                                                                                                             |
+| Database             | Database                             |         | Name of the Azure SQL Database.                                                                                                                             |
+| Database             | Schema                               |         | SQL Schema to be used for Dataverse tables.                                                                                                                 |
+| SynapseWorkspace     | SubscriptionId                       |         | Subscription ID of the Synapse workspace.                                                                                                                   |
+| SynapseWorkspace     | ResourceGroup                        |         | Resource group of the Synapse workspace.                                                                                                                    |
+| SynapseWorkspace     | Workspace                            |         | Name of the Synapse workspace.                                                                                                                              |
+| Ingestion            | Parallelism                          | 1       | Number of concurrent copy activities performed by the ingestion pipeline.                                                                                   |
+| SchemaHandling       | EnableSchemaUpgradeForExistingTables | true    | Enable the propagation of schema changes for existing tables.                                                                                               |
+| SchemaHandling       | OptionSetInt32                       | false   | Use int instead of long for integer OptionSet fields. **Note**: once set to true, the option cannot be to false; all tables must be removed and redeployed. |
+
+### Customize column data types
+
+The data type of columns of tables replicated from Dataverse is determined automatically based on the metadata from the source storage account.
+
+The default mapping is as follows.
+
+| Source Dataverse data type | Destination SQL Server data type |
+|----------------------------|----------------------------------|
+| binary                     | varbinary(max)                   |
+| boolean                    | bit                              |
+| byte                       | tinyint                          |
+| char                       | nchar                            |
+| date                       | date                             |
+| datetime                   | datetime2                        |
+| datetimeoffset             | datetimeoffset                   |
+| decimal                    | decimal                          |
+| double                     | float                            |
+| float                      | float                            |
+| guid                       | uniqueidentifier                 |
+| int16                      | smallint                         |
+| int32                      | int                              |
+| int64                      | bigint                           |
+| integer                    | int                              |
+| json                       | nvarchar(max)                    |
+| long                       | bigint                           |
+| short                      | smallint                         |
+| string                     | nvarchar                         |
+| time                       | time                             |
+| timestamp                  | datetime2                        |
+
+The data type of each column can be customized using a mapping file.
+
+The file must be in TSV (tab-separated values) format, with the columns below, without headers.
+
+| Column      | Definition                               |
+|-------------|------------------------------------------|
+| Table name  | The name of the table to be customized.  |
+| Column name | The name of the column to be customized. |
+| Data type   | The desired SQL Server data type.        |
+
+Table and column name are case insensitive.
+
+The data type must be a valid built-in SQL data type. XML, geometry, geography, hierarchy and custom data types are not supported.
+
+DataverseToSql verifies the data type is valid, but does not attempt to verify that it is compatible with source data. It is your responsibility to verify that the desired data type can contain existing data. Failure to do so will likely result in failures of the ingestion pipeline.
+
+The file must be named `CustomDatatypeMap.tsv`. **Note**: the name is case sensitive.
+
+The file must be placed in the configuration folder, along with `DataverseToSql.json`.
+
+The file is uploaded to the configuration container using the `deploy` command (see below). Later changes to the file can be uploaded using `deploy` again or replacing the file in the storage account with a new version.
+
+Sample content:
+
+```tsv
+account	accountcategorycode	int
+account	accountclassificationcode	int
+account	accountid	uniqueidentifier
+account	accountnumber	nvarchar(20)
+account	accountratingcode	int
+account	address1_addressid	uniqueidentifier
+account	address1_addresstypecode	int
+account	address1_city	nvarchar(50)
+```
+
+This feature is useful if you want to match the schema of an existing database (e.g the one generated by Data Export Service).
+You can extract the column data type information from an existing database using a query like the following.
+
+```sql
+SELECT
+    t.name [table],
+    c.name [column],
+    dt.name + CASE 
+        WHEN dt.name in (N'decimal', N'numeric') 
+            THEN N'(' + CAST(c.precision AS varchar(2)) + N',' + CAST(c.scale AS varchar(2)) + N')'
+        WHEN dt.name in (N'time', N'datetime2', N'datetimeoffset') 
+            THEN N'(' + CAST(c.scale AS varchar(2)) + N')'
+        WHEN dt.name in (N'float')
+            THEN CASE WHEN c.precision = 53 THEN N'' ELSE N'(' + CAST(c.precision AS varchar(2)) + N')' END
+        WHEN dt.name in (N'binary', N'char')
+            THEN N'(' + CAST(c.max_length AS nvarchar(4))+ N')'
+        WHEN dt.name = N'nchar'
+            THEN N'(' + CAST(c.max_length/2 AS nvarchar(4))+ N')'
+        WHEN dt.name in (N'varbinary', N'varchar')
+            THEN N'(' + CASE c.max_length WHEN -1 THEN N'max' ELSE CAST(c.max_length AS nvarchar(4)) END + N')'
+        WHEN dt.name = N'nvarchar'
+            THEN N'(' + CASE c.max_length WHEN -1 THEN N'max' ELSE CAST(c.max_length/2 AS nvarchar(4)) END + N')'
+        ELSE N''
+    END [datatype]
+FROM
+    sys.tables t
+    INNER JOIN sys.columns c
+        ON t.object_id = c.object_id
+    INNER JOIN sys.types dt
+        ON c.system_type_id = dt.system_type_id
+        AND dt.system_type_id = dt.user_type_id
+WHERE
+    dt.is_assembly_type = 0
+    and dt.name <> 'xml'
+ORDER BY
+    t.name,
+    c.name;
+```
 
 ### Provide scripts for custom SQL objects
 

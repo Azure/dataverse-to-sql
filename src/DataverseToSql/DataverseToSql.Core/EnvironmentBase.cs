@@ -1,7 +1,6 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-using Azure.Analytics.Synapse.Artifacts.Models;
 using Azure.Core;
 using Azure.Storage.Blobs;
 using DataverseToSql.Core.CdmModel;
@@ -9,7 +8,6 @@ using DataverseToSql.Core.Model;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using System.Collections.Concurrent;
-using System.Windows.Markup;
 
 namespace DataverseToSql.Core
 {
@@ -24,6 +22,7 @@ namespace DataverseToSql.Core
     {
         internal const string CONFIG_FILE = "DataverseToSql.json";
         internal const string CUSTOM_SQL_OBJECTS_FOLDER = "CustomSqlObjects";
+        internal const string CUSTOM_DATATYPE_MAP = "CustomDatatypeMap.tsv";
 
         protected readonly ILogger log;
         internal readonly TokenCredential Credential;
@@ -36,6 +35,7 @@ namespace DataverseToSql.Core
         private IList<(string name, string script)>? _customScripts = null;
         private Dictionary<string, ManagedCustomScript>? _managedCustomScriptsDict = null;
         private Dictionary<string, HashSet<string>>? _optionSets;
+        private Dictionary<string, Dictionary<string, string>>? _customDatatypeMap = null;
 
         public EnvironmentBase(
             ILogger log,
@@ -110,6 +110,8 @@ namespace DataverseToSql.Core
             // force loading optionset data
             await GetOptionSetAsync(cancellationToken);
 
+            await LoadCustomDatatypeMap(cancellationToken);
+
             await Parallel.ForEachAsync(await GetCdmEntityModelBlobNamesAsync(cancellationToken),
                 parallelOpts,
                 async (blobName, ct) =>
@@ -156,27 +158,104 @@ namespace DataverseToSql.Core
             return dict;
         }
 
+        private async Task LoadCustomDatatypeMap(CancellationToken cancellationToken)
+        {
+            var reader = await GetCustomDatatypeMapReader(cancellationToken);
+
+            if (reader is null)
+            {
+                log.LogInformation("Custom data type map file is not present.");
+                return;
+            }
+
+            try
+            {
+                _customDatatypeMap = new();
+
+                string? line;
+                int lineCount = 0;
+                while ((line = await reader.ReadLineAsync()) != null)
+                {
+                    lineCount++;
+                    var vals = line.Split('\t').Select(v => v.Trim().ToLower()).ToList();
+
+                    if (vals.Count != 3)
+                        throw new Exception($"Unexpected number of fields in the custom data type map file on line {lineCount}");
+
+                    for (int i = 0; i < 3; i++)
+                    {
+                        if (vals[i] == "")
+                            throw new Exception($"Empty field {i + 1} on line {lineCount} in the custom data type map file");
+                    }
+
+                    var table = vals[0];
+                    var column = vals[1];
+                    var datatype = vals[2];
+
+                    try
+                    {
+                        SqlBuiltinDataTypeValidator.Validate(datatype);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new Exception(
+                            $"Invalid data type on line {lineCount} in the custom data type map file: {ex.Message}",
+                            ex);
+                    }
+
+                    if (!_customDatatypeMap.ContainsKey(table))
+                        _customDatatypeMap[table] = new();
+
+                    if (_customDatatypeMap[table].ContainsKey(column))
+                        throw new Exception($"Duplicate column {column} in table {table} in the custom data type map file");
+
+                    _customDatatypeMap[table][column] = datatype;
+                }
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+            finally
+            {
+                reader.Close();
+            }
+        }
+
+        internal abstract Task<TextReader?> GetCustomDatatypeMapReader(CancellationToken cancellationToken);
+
         // Override the datatype of an entity attributes if necessary
         // e.g. when wanting to use int instead of bigint for optionsets.
         private async Task OverrideDatatypes(CdmEntity cdmEntity, CancellationToken cancellationToken)
         {
+
             // if OptionSetInt32 is true, override the SQL data type
             // of int64 optionset fields to int, instead of bigint
-            if (Config.SchemaHandling.OptionSetInt32)
+            if (Config.SchemaHandling.OptionSetInt32 || _customDatatypeMap is not null)
             {
+                var entityName = cdmEntity.Name.ToLower();
                 var optionSets = await GetOptionSetAsync(cancellationToken);
 
-                var entityName = cdmEntity.Name.ToLower();
                 foreach (var attribute in cdmEntity.Attributes)
                 {
                     var attributeName = attribute.Name.ToLower();
 
-                    if ((attributeName == "statecode"
+                    // override data type if OptionSetInt32 option is set
+                    if (Config.SchemaHandling.OptionSetInt32
+                        && (attributeName == "statecode"
                         || attributeName == "statuscode"
                         || (optionSets.ContainsKey(entityName) && optionSets[entityName].Contains(attributeName)))
                         && attribute.DataType.ToLower() == "int64")
                     {
                         attribute.CustomSqlDatatype = "int";
+                    }
+
+                    // override data type if there is a match in the custom data type map
+                    if (_customDatatypeMap is not null
+                        && _customDatatypeMap.ContainsKey(entityName)
+                        && _customDatatypeMap[entityName].ContainsKey(attributeName))
+                    {
+                        attribute.CustomSqlDatatype = _customDatatypeMap[entityName][attributeName];
                     }
                 }
             }
