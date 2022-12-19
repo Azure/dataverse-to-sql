@@ -43,6 +43,23 @@ namespace DataverseToSql.Core
             }
         }
 
+        internal override async Task<TextReader?> GetCustomDatatypeMapReader(CancellationToken cancellationToken)
+        {
+            var blobUriBuilder = new BlobUriBuilder(Config.ConfigurationStorage.ContainerUri())
+            {
+                BlobName = CUSTOM_DATATYPE_MAP
+            };
+
+            var blobClient = new BlobClient(blobUriBuilder.ToUri(), Credential);
+
+            if (!await blobClient.ExistsAsync(cancellationToken))
+                return null;
+
+            log.LogInformation("Loading custom data type map from {path}.", blobUriBuilder.ToUri());
+
+            return new StreamReader(await blobClient.OpenReadAsync(default, cancellationToken));
+        }
+
         internal override async Task<IList<(string name, string script)>> InitCustomScriptsAsync(CancellationToken cancellationToken)
         {
             List<(string name, string script)> customScripts = new();

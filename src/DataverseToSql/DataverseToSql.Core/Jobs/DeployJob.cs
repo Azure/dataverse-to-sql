@@ -53,6 +53,9 @@ namespace DataverseToSql.Core.Jobs
             // Upload the configuration files to the configuration storage container
             UploadConfiguration();
 
+            // Upload the custom data type map file
+            UploadCustomDatatypeMap();
+
             // Upload custom SQL objects to the configuration storage container
             UploadCustomSqlObjects();
 
@@ -770,6 +773,31 @@ namespace DataverseToSql.Core.Jobs
             blobClient.Upload(
                 content: File.Open(environment.Config.ConfigFilePath, FileMode.Open),
                 overwrite: true);
+        }
+
+        // Upload the custom data type map file, if present
+        private void UploadCustomDatatypeMap()
+        {
+            var customDatatypeMapPath = Path.Join(environment.LocalPath, EnvironmentBase.CUSTOM_DATATYPE_MAP);
+
+            if (File.Exists(customDatatypeMapPath))
+            {
+                log.LogInformation("Uploading custom data type map.");
+
+                var blobContainerClient = new BlobContainerClient(
+                    environment.Config.ConfigurationStorage.ContainerUri(),
+                    environment.Credential);
+
+                var blobClient = blobContainerClient.GetBlobClient($"/{EnvironmentBase.CUSTOM_DATATYPE_MAP}");
+
+                blobClient.Upload(
+                    content: File.Open(customDatatypeMapPath, FileMode.Open),
+                    overwrite: true);
+            }
+            else
+            {
+                log.LogInformation("No custom data type map to upload.");
+            }
         }
 
         // Upload custom SQL objects to the configuration storage container.
