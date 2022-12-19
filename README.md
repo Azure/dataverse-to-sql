@@ -349,6 +349,7 @@ Default template file:
 | Ingestion            | Parallelism                          | 1       | Number of concurrent copy activities performed by the ingestion pipeline.                                                                                   |
 | SchemaHandling       | EnableSchemaUpgradeForExistingTables | true    | Enable the propagation of schema changes for existing tables.                                                                                               |
 | SchemaHandling       | OptionSetInt32                       | false   | Use int instead of long for integer OptionSet fields. **Note**: once set to true, the option cannot be to false; all tables must be removed and redeployed. |
+| SchemaHandling       | SkipIsDeleteColumn                   | false   | Skip the IsDelete column when generating the target tables.                                                                                                 |
 
 ### Customize column data types
 

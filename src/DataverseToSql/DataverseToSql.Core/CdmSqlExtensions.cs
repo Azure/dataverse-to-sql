@@ -21,17 +21,20 @@ namespace DataverseToSql.Core
         //   by the merge stored procedure.
         // - The CREATE PROCEDURE statement of the merge stored procedure invoked by
         //   the Copy activity.
-        internal static string SqlScripts(this CdmEntity cdmEntity, string schema)
+        internal static string SqlScripts(this CdmEntity cdmEntity, string schema, bool skipIsDeleteColumn)
         {
             var sb = new StringBuilder();
-            sb.AppendLine(cdmEntity.TableScript(schema));
-            sb.AppendLine(cdmEntity.TableTypeScript());
-            sb.AppendLine(cdmEntity.MergeProcedureScript(schema));
+            sb.AppendLine(cdmEntity.TableScript(schema,
+                attributeFilter: a => !skipIsDeleteColumn || a.Name.ToLower() != "isdelete"));
+            sb.AppendLine(cdmEntity.TableTypeScript(
+                attributeFilter: a => !skipIsDeleteColumn || a.Name.ToLower() != "isdelete"));
+            sb.AppendLine(cdmEntity.MergeProcedureScript(schema,
+                attributeFilter: a => !skipIsDeleteColumn || a.Name.ToLower() != "isdelete"));
             return sb.ToString();
         }
 
         // Return the CREATE TABLE statement of the target table.
-        internal static string TableScript(this CdmEntity entity, string schema)
+        internal static string TableScript(this CdmEntity entity, string schema, Func<CdmAttribute, bool> attributeFilter)
         {
             var sb = new StringBuilder();
 
@@ -41,7 +44,9 @@ namespace DataverseToSql.Core
             sb.Append(SQL_CODE_INDENT);
             sb.AppendJoin(
                 $",\n{SQL_CODE_INDENT}",
-                entity.Attributes.Select(attr => attr.SqlColumnDef())
+                entity.Attributes
+                .Where(attributeFilter)
+                .Select(attr => attr.SqlColumnDef())
                 ); ;
 
 
@@ -64,13 +69,14 @@ namespace DataverseToSql.Core
 
         // Return he CREATE TYPE statement for the creation of the table type required
         // by the merge stored procedure.
-        internal static string TableTypeScript(this CdmEntity entity)
+        internal static string TableTypeScript(this CdmEntity entity, Func<CdmAttribute, bool> attributeFilter)
         {
             var sb = new StringBuilder();
 
             sb.AppendLine($"CREATE TYPE [{DV_SCHEMA}].{entity.TableTypeName()} AS TABLE (");
 
             sb.AppendJoin($",\n", entity.Attributes
+                //.Where(attributeFilter)
                 .Select(attr => $"{attr.SqlColumnDef()} NULL"));
 
             sb.AppendLine(");");
@@ -81,7 +87,7 @@ namespace DataverseToSql.Core
 
         // Return the CREATE PROCEDURE statement of the merge stored procedure invoked by
         // the Copy activity.
-        internal static string MergeProcedureScript(this CdmEntity entity, string schema)
+        internal static string MergeProcedureScript(this CdmEntity entity, string schema, Func<CdmAttribute, bool> attributeFilter)
         {
             var sb = new StringBuilder();
 
@@ -91,7 +97,7 @@ namespace DataverseToSql.Core
             var insertTargetColumns = new List<string>();
             var insertSourceColumns = new List<string>();
 
-            foreach (var attr in entity.Attributes)
+            foreach (var attr in entity.Attributes.Where(attributeFilter))
             {
                 if (!entity.PrimaryKeyAttributes.Contains(attr))
                 {
@@ -125,7 +131,7 @@ namespace DataverseToSql.Core
         internal static string GetFullLoadServerlessQuery(
             this CdmEntity entity,
             Uri blobUri,
-            IList<(string name, string datatype)> targetColumns) =>
+            IList<string> targetColumns) =>
             entity.IncrementalLoadServerlessQuery(blobUri, targetColumns) + "WHERE ISNULL(IsDelete, 'False') <> 'True'";
 
         // Return the Serverless SQL Pool query to read the specified blob during 
@@ -133,13 +139,13 @@ namespace DataverseToSql.Core
         internal static string IncrementalLoadServerlessQuery(
             this CdmEntity entity,
             Uri blobUri,
-            IList<(string name, string datatype)> targetColumns)
+            IList<string> targetColumns)
         {
             var sourceColumns = string.Join(",", entity.Attributes.Select(attr => attr.SqlColumnDef(serverless: true)));
             var primaryKeyCols = entity.PrimaryKeyAttributes.Select(a => a.SqlColumnName()).ToList();
             var primaryKeyString = string.Join(",", primaryKeyCols);
             var primaryKeyJoinPredicates = string.Join(" AND ", primaryKeyCols.Select(c => $"s.{c} = r.{c}"));
-            var targetColumnList = string.Join(",", targetColumns.Select(c => $"[{c.name}]"));
+            var targetColumnList = string.Join(",", targetColumns);
 
             return $@"
                 WITH cte_source AS (
