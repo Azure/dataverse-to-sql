@@ -145,7 +145,7 @@ namespace DataverseToSql.Core
             var primaryKeyCols = entity.PrimaryKeyAttributes.Select(a => a.SqlColumnName()).ToList();
             var primaryKeyString = string.Join(",", primaryKeyCols);
             var primaryKeyJoinPredicates = string.Join(" AND ", primaryKeyCols.Select(c => $"s.{c} = r.{c}"));
-            var targetColumnList = string.Join(",", targetColumns);
+            var targetColumnList = string.Join(",", targetColumns.Select(c=>$"[{c}]"));
 
             return $@"
                 WITH cte_source AS (
