@@ -9,6 +9,7 @@ using Azure.Storage.Blobs.Specialized;
 using BlockBlobClientCopyRangeExtension;
 using DataverseToSql.Core.Model;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 
 namespace DataverseToSql.Core.Jobs
 {
@@ -246,40 +247,55 @@ namespace DataverseToSql.Core.Jobs
 
             // Process each entity's partition individually
             var partitionCount = 0;
-            foreach (var partition in cdmEntity.Partitions)
+            foreach (var partitionGroup in cdmEntity.PartitionGroups)
             {
-                log.LogInformation("Entity {entity}: adding partition {partition} for initial ingestion.", managedEntity.Name, partition.Name);
+                log.LogInformation(
+                    "Entity {entity}: processing partition group {partitionGroup}.",
+                    managedEntity.Name,
+                    partitionGroup.Name);
 
-                partitionCount++;
+                var targetPartitionUris = new List<Uri>();
 
-                var sourcePartitionUri = new BlobUriBuilder(environment.Config.DataverseStorage.ContainerUri())
+                foreach (var partition in partitionGroup.Partitions)
                 {
-                    BlobName = $"{managedEntity.Name}/{partition.Name}.csv"
-                }.ToUri();
+                    log.LogInformation(
+                        "Entity {entity}: adding partition {partition} for initial ingestion.",
+                        managedEntity.Name,
+                        partition.Name);
 
-                var targetPartitionUri = new BlobUriBuilder(environment.Config.IncrementalStorage.ContainerUri())
-                {
-                    BlobName = $"{managedEntity.Name}/{partition.Name}_{ingestionTimestamp}.csv"
-                }.ToUri();
+                    partitionCount++;
 
-                // Copy the current partition data to the incremental storage
-                await CopyBlob(sourcePartitionUri, targetPartitionUri, cancellationToken);
+                    var sourcePartitionUri = new BlobUriBuilder(environment.Config.DataverseStorage.ContainerUri())
+                    {
+                        BlobName = $"{managedEntity.Name}/{partition.Name}.csv"
+                    }.ToUri();
 
-                var blobClient = new BlobClient(targetPartitionUri, environment.Credential);
+                    var targetPartitionUri = new BlobUriBuilder(environment.Config.IncrementalStorage.ContainerUri())
+                    {
+                        BlobName = $"{managedEntity.Name}/{partition.Name}_{ingestionTimestamp}.csv"
+                    }.ToUri();
 
-                // Record the size of the partition into the ManagedBlobs table
-                // as the starting offset of later incremental ingestion
-                var managedBlob = new ManagedBlob(
-                    managedEntity,
-                    $"{partition.Name}.csv",
-                    (await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken)).Value.ContentLength
-                    );
-                await environment.database.UpsertAsync(managedBlob, cancellationToken);
+                    // Copy the current partition data to the incremental storage
+                    await CopyBlob(sourcePartitionUri, targetPartitionUri, cancellationToken);
+
+                    var blobClient = new BlobClient(targetPartitionUri, environment.Credential);
+
+                    // Record the size of the partition into the ManagedBlobs table
+                    // as the starting offset of later incremental ingestion
+                    var managedBlob = new ManagedBlob(
+                        managedEntity,
+                        $"{partition.Name}.csv",
+                        (await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken)).Value.ContentLength
+                        );
+                    await environment.database.UpsertAsync(managedBlob, cancellationToken);
+
+                    targetPartitionUris.Add(targetPartitionUri);
+                }
 
                 // Generate the query to run in Serverless SQL pool to read
                 // and deduplicate the partition
                 string serverlessQuery = cdmEntity.GetFullLoadServerlessQuery(
-                    targetPartitionUri,
+                    targetPartitionUris,
                     targetColumns
                         .Where(c => !environment.Config.SchemaHandling.SkipIsDeleteColumn || c.ToLower() != "isdelete")
                         .ToList());
@@ -287,7 +303,7 @@ namespace DataverseToSql.Core.Jobs
                 // Record the metadata of the blob for ingestion
                 var blobToIngest = new BlobToIngest(
                     managedEntity,
-                    managedBlob.Name,
+                    partitionGroup.Name,
                     environment.Config.Database.Schema,
                     managedEntity.Name,
                     serverlessQuery,
@@ -372,7 +388,7 @@ namespace DataverseToSql.Core.Jobs
             var newData = false;
 
             // Process each blob separately
-            foreach (var managedBlob in managedBlobs)
+            foreach (var managedBlob in managedBlobs.OrderBy(mb => mb.Name))
             {
                 var sourceBlobUri = new BlobUriBuilder(environment.Config.DataverseStorage.ContainerUri())
                 {
@@ -430,7 +446,9 @@ namespace DataverseToSql.Core.Jobs
 
                     // Generate the query to run in Serverless SQL pool to read
                     // and deduplicate the new data
-                    var serverlessQuery = cdmEntity.IncrementalLoadServerlessQuery(targetBlobUri, targetColumns);
+                    var serverlessQuery = cdmEntity.IncrementalLoadServerlessQuery(
+                        new List<Uri>() { targetBlobUri }, 
+                        targetColumns);
 
                     // Record the metadata of the blob for ingestion
                     await environment.database.InsertAsync(new BlobToIngest(
