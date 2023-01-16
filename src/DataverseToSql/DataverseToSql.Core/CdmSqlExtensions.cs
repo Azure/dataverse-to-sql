@@ -130,29 +130,39 @@ namespace DataverseToSql.Core
         // full load (used in initial load of new entities)
         internal static string GetFullLoadServerlessQuery(
             this CdmEntity entity,
-            Uri blobUri,
+            IList<Uri> blobUris,
             IList<string> targetColumns) =>
-            entity.IncrementalLoadServerlessQuery(blobUri, targetColumns) + "WHERE ISNULL(IsDelete, 'False') <> 'True'";
+            entity.IncrementalLoadServerlessQuery(blobUris, targetColumns) + "WHERE ISNULL(IsDelete, 'False') <> 'True'";
 
         // Return the Serverless SQL Pool query to read the specified blob during 
         // incremental load
         internal static string IncrementalLoadServerlessQuery(
             this CdmEntity entity,
-            Uri blobUri,
+            IList<Uri> blobUris,
             IList<string> targetColumns)
         {
+            if (blobUris.Count == 0)
+            {
+                throw new Exception("Expected one or more blob URIs to generate the serverless query");
+            }
+
             var sourceColumns = string.Join(",", entity.Attributes.Select(attr => attr.SqlColumnDef(serverless: true)));
             var primaryKeyCols = entity.PrimaryKeyAttributes.Select(a => a.SqlColumnName()).ToList();
             var primaryKeyString = string.Join(",", primaryKeyCols);
             var primaryKeyJoinPredicates = string.Join(" AND ", primaryKeyCols.Select(c => $"s.{c} = r.{c}"));
             var targetColumnList = string.Join(",", targetColumns.Select(c=>$"[{c}]"));
 
-            return $@"
-                WITH cte_source AS (
+            var openrowSetQueries = string.Join(" UNION ALL ",
+                blobUris.Select((blobUri, index) => $@"
                     SELECT  *
                     FROM    OPENROWSET(BULK ( N'{blobUri}' ),
                             FORMAT = 'csv', FIELDTERMINATOR  = ',', FIELDQUOTE = '""')
-                            WITH ({sourceColumns}) AS T1
+                            WITH ({sourceColumns}) AS T{index}
+                    "));
+
+            return $@"
+                WITH cte_source AS (
+                    {openrowSetQueries}
                 ),
                 cte_rownumber AS (
                     SELECT  ROW_NUMBER() OVER (PARTITION BY {primaryKeyString} ORDER BY [SinkModifiedOn] DESC, [versionnumber] DESC) [DvRowNumber],

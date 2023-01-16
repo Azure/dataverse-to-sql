@@ -68,6 +68,22 @@ namespace DataverseToSql.Core.CdmModel
             }
         }
 
+        // Return set of partitions grouped by name.
+        // Partitions belonging to the same period are grouped together.
+        // E.g. "2018" and "2018_001" are grouped together under 2018.
+        internal IList<CdmPartitionGroup> PartitionGroups
+        {
+            get
+            {
+                return Partitions
+                    .GroupBy(p => p.Name.Split('_')[0])
+                    .Select(g => new CdmPartitionGroup(
+                        name: g.Key,
+                        partitions: g.ToList()))
+                    .ToList();
+            }
+        }
+
         // Determines if the entity has a primary key.
         internal bool HasPrimaryKey { get => PrimaryKeyAttributes.Count > 0; }
     }
