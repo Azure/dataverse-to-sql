@@ -245,7 +245,8 @@ namespace DataverseToSql.Core
                 upgradeExisting: true,
                 options: new()
                 {
-                    DropObjectsNotInSource = false
+                    DropObjectsNotInSource = false,
+                    BlockOnPossibleDataLoss = false
                 });
         }
 
