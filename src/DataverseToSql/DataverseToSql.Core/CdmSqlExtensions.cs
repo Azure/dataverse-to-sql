@@ -132,14 +132,21 @@ namespace DataverseToSql.Core
             this CdmEntity entity,
             IList<Uri> blobUris,
             IList<string> targetColumns) =>
-            entity.IncrementalLoadServerlessQuery(blobUris, targetColumns) + "WHERE ISNULL(IsDelete, 'False') <> 'True'";
+            entity.GetServerlessQueryInternal(blobUris, targetColumns, includeDeletedRecords: false);
 
         // Return the Serverless SQL Pool query to read the specified blob during 
         // incremental load
-        internal static string IncrementalLoadServerlessQuery(
+        internal static string GetIncrementalLoadServerlessQuery(
             this CdmEntity entity,
             IList<Uri> blobUris,
-            IList<string> targetColumns)
+            IList<string> targetColumns) =>
+            entity.GetServerlessQueryInternal(blobUris, targetColumns, includeDeletedRecords: true);
+
+        private static string GetServerlessQueryInternal(
+            this CdmEntity entity,
+            IList<Uri> blobUris,
+            IList<string> targetColumns,
+            bool includeDeletedRecords)
         {
             if (blobUris.Count == 0)
             {
@@ -150,7 +157,7 @@ namespace DataverseToSql.Core
             var primaryKeyCols = entity.PrimaryKeyAttributes.Select(a => a.SqlColumnName()).ToList();
             var primaryKeyString = string.Join(",", primaryKeyCols);
             var primaryKeyJoinPredicates = string.Join(" AND ", primaryKeyCols.Select(c => $"s.{c} = r.{c}"));
-            var targetColumnList = string.Join(",", targetColumns.Select(c=>$"[{c}]"));
+            var targetColumnList = string.Join(",", targetColumns.Select(c => $"[{c}]"));
 
             var openrowSetQueries = string.Join(" UNION ALL ",
                 blobUris.Select((blobUri, index) => $@"
@@ -160,9 +167,13 @@ namespace DataverseToSql.Core
                             WITH ({sourceColumns}) AS T{index}
                     "));
 
-            return $@"
-                WITH cte_source AS (
+            var innerQuery = $@"                
+                WITH cte_openrowset AS (
                     {openrowSetQueries}
+                ),
+                cte_source AS (
+                    SELECT TOP <<<TOP_PLACEHOLDER>>> *
+                    FROM cte_openrowset
                 ),
                 cte_rownumber AS (
                     SELECT  ROW_NUMBER() OVER (PARTITION BY {primaryKeyString} ORDER BY [SinkModifiedOn] DESC, [versionnumber] DESC) [DvRowNumber],
@@ -180,17 +191,38 @@ namespace DataverseToSql.Core
                                 AND s.[versionnumber] = r.[versionnumber]
                     WHERE   r.DvRowNumber = 1
                 )
-                SELECT
+                SELECT DISTINCT
                     {targetColumnList}
                 FROM
-                    cte_most_recent_records
+                    cte_most_recent_records            
+                "
+                + (includeDeletedRecords ? "" : "WHERE ISNULL(IsDelete, 'False') <> 'True'");
+
+            var formattedInnerQuery = innerQuery
+                .Replace("'", "''")
+                .Replace("<<<TOP_PLACEHOLDER>>>", "' + CAST(@rowcount AS nvarchar(max)) + N'");
+
+            var outerQuery = $@"
+                DECLARE @rowcount bigint
+
+                WITH cte_openrowset AS (
+                    {openrowSetQueries}
+                )
+                SELECT  @rowcount=count(*)
+                FROM    cte_openrowset
+
+                DECLARE @query nvarchar(max) = N'{formattedInnerQuery}'
+
+                EXEC sp_executesql @query
                 ";
+
+            return outerQuery;
         }
 
         // Return the SQL column definition of the CDM attribute
         // in the format [<column name>] [<data type>]
         internal static string SqlColumnDef(this CdmAttribute attr, bool serverless = false)
-            => $"{attr.SqlColumnName()} {attr.SqlDataType(serverless)}";
+        => $"{attr.SqlColumnName()} {attr.SqlDataType(serverless)}";
 
         // Return the formated SQL column name of the CDM attribute
         // in the format [<column name>]
