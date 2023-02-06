@@ -446,7 +446,7 @@ namespace DataverseToSql.Core.Jobs
 
                     // Generate the query to run in Serverless SQL pool to read
                     // and deduplicate the new data
-                    var serverlessQuery = cdmEntity.IncrementalLoadServerlessQuery(
+                    var serverlessQuery = cdmEntity.GetIncrementalLoadServerlessQuery(
                         new List<Uri>() { targetBlobUri }, 
                         targetColumns);
 
