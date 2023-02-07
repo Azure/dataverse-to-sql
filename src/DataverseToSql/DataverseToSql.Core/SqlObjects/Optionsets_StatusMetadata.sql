@@ -2,22 +2,22 @@
 -- Licensed under the MIT License.
 
 CREATE TABLE [$$SCHEMA$$].[StatusMetadata] (
-	[EntityName] [varchar](128) NULL,
-	[State] [bigint] NULL,
-	[Status] [bigint] NULL,
-	[IsUserLocalizedLabel] [varchar](6) NULL,
-	[LocalizedLabelLanguageCode] [bigint] NULL,
-	[LocalizedLabel] [varchar](700) NULL
+	[EntityName] [nvarchar](64) NULL,
+	[State] [int] NULL,
+	[Status] [int] NULL,
+	[IsUserLocalizedLabel] [bit] NULL,
+	[LocalizedLabelLanguageCode] [int] NULL,
+	[LocalizedLabel] [nvarchar](350) NULL
 );
 GO
 
 CREATE TYPE [DataverseToSql].[StatusMetadata_TableType] AS TABLE (
-	[EntityName] [varchar](128) NULL,
-	[State] [bigint] NULL,
-	[Status] [bigint] NULL,
-	[IsUserLocalizedLabel] [varchar](6) NULL,
-	[LocalizedLabelLanguageCode] [bigint] NULL,
-	[LocalizedLabel] [varchar](700) NULL
+	[EntityName] [nvarchar](64) NULL,
+	[State] [int] NULL,
+	[Status] [int] NULL,
+	[IsUserLocalizedLabel] [bit] NULL,
+	[LocalizedLabelLanguageCode] [int] NULL,
+	[LocalizedLabel] [nvarchar](350) NULL
 );
 GO
 

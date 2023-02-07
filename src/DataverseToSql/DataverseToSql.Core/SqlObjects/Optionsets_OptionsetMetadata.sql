@@ -2,22 +2,22 @@
 -- Licensed under the MIT License.
 
 CREATE TABLE [$$SCHEMA$$].[OptionsetMetadata] (
-	[EntityName] [varchar](128) NULL,
-	[OptionSetName] [varchar](128)  NULL,
-	[Option] [bigint] NULL,
-	[IsUserLocalizedLabel] [varchar](6) NULL,
-	[LocalizedLabelLanguageCode] [bigint] NULL,
-	[LocalizedLabel] [varchar](700)  NULL
+	[EntityName] [nvarchar](64) NULL,
+	[OptionSetName] [nvarchar](64)  NULL,
+	[Option] [int] NULL,
+	[IsUserLocalizedLabel] [bit] NULL,
+	[LocalizedLabelLanguageCode] [int] NULL,
+	[LocalizedLabel] [nvarchar](350)  NULL
 );
 GO
 
 CREATE TYPE [DataverseToSql].[OptionsetMetadata_TableType] AS TABLE (
-	[EntityName] [varchar](128) NULL,
-	[OptionSetName] [varchar](128)  NULL,
-	[Option] [bigint] NULL,
-	[IsUserLocalizedLabel] [varchar](6) NULL,
-	[LocalizedLabelLanguageCode] [bigint] NULL,
-	[LocalizedLabel] [varchar](700)  NULL
+	[EntityName] [nvarchar](64) NULL,
+	[OptionSetName] [nvarchar](64)  NULL,
+	[Option] [int] NULL,
+	[IsUserLocalizedLabel] [bit] NULL,
+	[LocalizedLabelLanguageCode] [int] NULL,
+	[LocalizedLabel] [nvarchar](350)  NULL
 );
 GO
 

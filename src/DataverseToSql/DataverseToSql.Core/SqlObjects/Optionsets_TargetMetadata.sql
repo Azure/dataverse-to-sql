@@ -2,18 +2,18 @@
 -- Licensed under the MIT License.
 
 CREATE TABLE [$$SCHEMA$$].[TargetMetadata] (
-	[EntityName] [varchar](128) NULL,
-	[AttributeName] [varchar](128) NULL,
-	[ReferencedEntity] [varchar](128) NULL,
-	[ReferencedAttribute] [varchar](128) NULL
+	[EntityName] [nvarchar](64) NULL,
+	[AttributeName] [nvarchar](64) NULL,
+	[ReferencedEntity] [nvarchar](64) NULL,
+	[ReferencedAttribute] [nvarchar](64) NULL
 );
 GO
 
 CREATE TYPE [DataverseToSql].[TargetMetadata_TableType] AS TABLE (
-	[EntityName] [varchar](128) NULL,
-	[AttributeName] [varchar](128) NULL,
-	[ReferencedEntity] [varchar](128) NULL,
-	[ReferencedAttribute] [varchar](128) NULL
+	[EntityName] [nvarchar](64) NULL,
+	[AttributeName] [nvarchar](64) NULL,
+	[ReferencedEntity] [nvarchar](64) NULL,
+	[ReferencedAttribute] [nvarchar](64) NULL
 );
 GO
 
