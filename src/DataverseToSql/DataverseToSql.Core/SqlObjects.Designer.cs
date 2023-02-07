@@ -94,11 +94,7 @@ namespace DataverseToSql.Core {
         ///AS
         ///SELECT
         ///	[EntityName],
-        ///	[BlobName],
-        ///	[TargetSchema],
-        ///	[TargetTable],
-        ///	[ServerlessQuery],
-        ///	[LoadType]
+        ///	[BlobName]
         ///FROM
         ///	[DataverseToSql].[BlobsToIngest]
         ///WHERE
@@ -401,19 +397,45 @@ namespace DataverseToSql.Core {
         ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
         ///-- Licensed under the MIT License.
         ///
+        ///CREATE TABLE [$$SCHEMA$$].[AttributeMetadata] (
+        ///	[Id] [bigint] NULL,
+        ///	[EntityName] [nvarchar](64) NULL,
+        ///	[AttributeName] [nvarchar](64) NULL,
+        ///	[AttributeType] [nvarchar](64) NULL,
+        ///	[AttributeTypeCode] [int] NULL,
+        ///	[Version] [bigint] NULL,
+        ///	[Timestamp] [datetime] NULL,
+        ///	[MetadataId] [nvarchar](64) NULL,
+        ///	[Precision] [int] NULL,
+        ///);
+        ///GO
+        ///
+        ///CREATE TYPE [DataverseToSql].[AttributeMetadata_TableType] AS TABLE (
+        ///	[Id] [bigint [rest of string was truncated]&quot;;.
+        /// </summary>
+        internal static string Optionsets_AttributeMetadata {
+            get {
+                return ResourceManager.GetString("Optionsets_AttributeMetadata", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
         ///CREATE TABLE [$$SCHEMA$$].[GlobalOptionsetMetadata] (
-        ///	[OptionSetName] [varchar](128) NULL,
-        ///	[Option] [bigint] NULL,
-        ///	[IsUserLocalizedLabel] [varchar](6) NULL,
-        ///	[LocalizedLabelLanguageCode] [bigint] NULL,
-        ///	[LocalizedLabel] [varchar](700) NULL,
-        ///	[GlobalOptionSetName] [varchar](128) NULL,
-        ///	[EntityName] [varchar](128) NULL
+        ///	[OptionSetName] [nvarchar](64) NULL,
+        ///	[Option] [int] NULL,
+        ///	[IsUserLocalizedLabel] [bit] NULL,
+        ///	[LocalizedLabelLanguageCode] [int] NULL,
+        ///	[LocalizedLabel] [nvarchar](350) NULL,
+        ///	[GlobalOptionSetName] [nvarchar](64) NULL,
+        ///	[EntityName] [nvarchar](64) NULL
         ///);
         ///GO
         ///
         ///CREATE TYPE [DataverseToSql].[GlobalOptionsetMetadata_TableType] AS TABLE (
-        ///	[OptionSetName] [rest of string was truncated]&quot;;.
+        ///	[OptionSetName] [nvarchar]( [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string Optionsets_GlobalOptionsetMetadata {
             get {
@@ -426,18 +448,19 @@ namespace DataverseToSql.Core {
         ///-- Licensed under the MIT License.
         ///
         ///CREATE TABLE [$$SCHEMA$$].[OptionsetMetadata] (
-        ///	[EntityName] [varchar](128) NULL,
-        ///	[OptionSetName] [varchar](128)  NULL,
-        ///	[Option] [bigint] NULL,
-        ///	[IsUserLocalizedLabel] [varchar](6) NULL,
-        ///	[LocalizedLabelLanguageCode] [bigint] NULL,
-        ///	[LocalizedLabel] [varchar](700)  NULL
+        ///	[EntityName] [nvarchar](64) NULL,
+        ///	[OptionSetName] [nvarchar](64)  NULL,
+        ///	[Option] [int] NULL,
+        ///	[IsUserLocalizedLabel] [bit] NULL,
+        ///	[LocalizedLabelLanguageCode] [int] NULL,
+        ///	[LocalizedLabel] [nvarchar](350)  NULL
         ///);
         ///GO
         ///
         ///CREATE TYPE [DataverseToSql].[OptionsetMetadata_TableType] AS TABLE (
-        ///	[EntityName] [varchar](128) NULL,
-        ///	[OptionSetName] [varchar](128)  NU [rest of string was truncated]&quot;;.
+        ///	[EntityName] [nvarchar](64) NULL,
+        ///	[OptionSetName] [nvarchar](64)  NULL,
+        ///	[Optio [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string Optionsets_OptionsetMetadata {
             get {
@@ -450,19 +473,19 @@ namespace DataverseToSql.Core {
         ///-- Licensed under the MIT License.
         ///
         ///CREATE TABLE [$$SCHEMA$$].[StateMetadata] (
-        ///	[EntityName] [varchar](128) NULL,
-        ///	[State] [bigint] NULL,
-        ///	[IsUserLocalizedLabel] [varchar](6) NULL,
-        ///	[LocalizedLabelLanguageCode] [bigint] NULL,
-        ///	[LocalizedLabel] [varchar](700) NULL
+        ///	[EntityName] [nvarchar](64) NULL,
+        ///	[State] [int] NULL,
+        ///	[IsUserLocalizedLabel] [bit] NULL,
+        ///	[LocalizedLabelLanguageCode] [int] NULL,
+        ///	[LocalizedLabel] [nvarchar](350) NULL
         ///);
         ///GO
         ///
         ///CREATE TYPE [DataverseToSql].[StateMetadata_TableType] AS TABLE (
-        ///	[EntityName] [varchar](128) NULL,
-        ///	[State] [bigint] NULL,
-        ///	[IsUserLocalizedLabel] [varchar](6) NULL,
-        ///	[LocalizedLabel [rest of string was truncated]&quot;;.
+        ///	[EntityName] [nvarchar](64) NULL,
+        ///	[State] [int] NULL,
+        ///	[IsUserLocalizedLabel] [bit] NULL,
+        ///	[LocalizedLabelLanguageCode] [int] NU [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string Optionsets_StateMetadata {
             get {
@@ -475,20 +498,20 @@ namespace DataverseToSql.Core {
         ///-- Licensed under the MIT License.
         ///
         ///CREATE TABLE [$$SCHEMA$$].[StatusMetadata] (
-        ///	[EntityName] [varchar](128) NULL,
-        ///	[State] [bigint] NULL,
-        ///	[Status] [bigint] NULL,
-        ///	[IsUserLocalizedLabel] [varchar](6) NULL,
-        ///	[LocalizedLabelLanguageCode] [bigint] NULL,
-        ///	[LocalizedLabel] [varchar](700) NULL
+        ///	[EntityName] [nvarchar](64) NULL,
+        ///	[State] [int] NULL,
+        ///	[Status] [int] NULL,
+        ///	[IsUserLocalizedLabel] [bit] NULL,
+        ///	[LocalizedLabelLanguageCode] [int] NULL,
+        ///	[LocalizedLabel] [nvarchar](350) NULL
         ///);
         ///GO
         ///
         ///CREATE TYPE [DataverseToSql].[StatusMetadata_TableType] AS TABLE (
-        ///	[EntityName] [varchar](128) NULL,
-        ///	[State] [bigint] NULL,
-        ///	[Status] [bigint] NULL,
-        ///	[IsUs [rest of string was truncated]&quot;;.
+        ///	[EntityName] [nvarchar](64) NULL,
+        ///	[State] [int] NULL,
+        ///	[Status] [int] NULL,
+        ///	[IsUserLocalizedLabel] [bi [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string Optionsets_StatusMetadata {
             get {
@@ -501,18 +524,18 @@ namespace DataverseToSql.Core {
         ///-- Licensed under the MIT License.
         ///
         ///CREATE TABLE [$$SCHEMA$$].[TargetMetadata] (
-        ///	[EntityName] [varchar](128) NULL,
-        ///	[AttributeName] [varchar](128) NULL,
-        ///	[ReferencedEntity] [varchar](128) NULL,
-        ///	[ReferencedAttribute] [varchar](128) NULL
+        ///	[EntityName] [nvarchar](64) NULL,
+        ///	[AttributeName] [nvarchar](64) NULL,
+        ///	[ReferencedEntity] [nvarchar](64) NULL,
+        ///	[ReferencedAttribute] [nvarchar](64) NULL
         ///);
         ///GO
         ///
         ///CREATE TYPE [DataverseToSql].[TargetMetadata_TableType] AS TABLE (
-        ///	[EntityName] [varchar](128) NULL,
-        ///	[AttributeName] [varchar](128) NULL,
-        ///	[ReferencedEntity] [varchar](128) NULL,
-        ///	[ReferencedAttribute] [varchar [rest of string was truncated]&quot;;.
+        ///	[EntityName] [nvarchar](64) NULL,
+        ///	[AttributeName] [nvarchar](64) NULL,
+        ///	[ReferencedEntity] [nvarchar](64) NULL,
+        ///	[ReferencedAttribute] [nvarcha [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string Optionsets_TargetMetadata {
             get {
