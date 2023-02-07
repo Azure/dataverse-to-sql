@@ -2,24 +2,24 @@
 -- Licensed under the MIT License.
 
 CREATE TABLE [$$SCHEMA$$].[GlobalOptionsetMetadata] (
-	[OptionSetName] [varchar](128) NULL,
-	[Option] [bigint] NULL,
-	[IsUserLocalizedLabel] [varchar](6) NULL,
-	[LocalizedLabelLanguageCode] [bigint] NULL,
-	[LocalizedLabel] [varchar](700) NULL,
-	[GlobalOptionSetName] [varchar](128) NULL,
-	[EntityName] [varchar](128) NULL
+	[OptionSetName] [nvarchar](64) NULL,
+	[Option] [int] NULL,
+	[IsUserLocalizedLabel] [bit] NULL,
+	[LocalizedLabelLanguageCode] [int] NULL,
+	[LocalizedLabel] [nvarchar](350) NULL,
+	[GlobalOptionSetName] [nvarchar](64) NULL,
+	[EntityName] [nvarchar](64) NULL
 );
 GO
 
 CREATE TYPE [DataverseToSql].[GlobalOptionsetMetadata_TableType] AS TABLE (
-	[OptionSetName] [varchar](128) NULL,
-	[Option] [bigint] NULL,
-	[IsUserLocalizedLabel] [varchar](6) NULL,
-	[LocalizedLabelLanguageCode] [bigint] NULL,
-	[LocalizedLabel] [varchar](700) NULL,
-	[GlobalOptionSetName] [varchar](128) NULL,
-	[EntityName] [varchar](128) NULL
+	[OptionSetName] [nvarchar](64) NULL,
+	[Option] [int] NULL,
+	[IsUserLocalizedLabel] [bit] NULL,
+	[LocalizedLabelLanguageCode] [int] NULL,
+	[LocalizedLabel] [nvarchar](350) NULL,
+	[GlobalOptionSetName] [nvarchar](64) NULL,
+	[EntityName] [nvarchar](64) NULL
 );
 GO
 
