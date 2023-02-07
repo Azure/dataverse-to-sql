@@ -68,6 +68,9 @@ namespace DataverseToSql.Core
                     _model.AddObjects(SqlObjects.DataverseToSql_ManagedCustomScripts_Table);
                     _model.AddObjects(SqlObjects.DataverseToSql_ManagedCustomScripts_Upsert_Proc);
 
+                    _model.AddObjects(SqlObjects.Optionsets_AttributeMetadata.Replace(
+                        "$$SCHEMA$$", Config.Schema));
+
                     _model.AddObjects(SqlObjects.Optionsets_OptionsetMetadata.Replace(
                         "$$SCHEMA$$", Config.Schema));
 

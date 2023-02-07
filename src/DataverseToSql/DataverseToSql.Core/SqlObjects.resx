@@ -160,6 +160,9 @@
   <data name="DataverseToSql_Types" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>sqlobjects\dataversetosql.types.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
   </data>
+  <data name="Optionsets_AttributeMetadata" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>sqlobjects\optionsets_attributemetadata.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
+  </data>
   <data name="Optionsets_GlobalOptionsetMetadata" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>sqlobjects\optionsets_globaloptionsetmetadata.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
   </data>

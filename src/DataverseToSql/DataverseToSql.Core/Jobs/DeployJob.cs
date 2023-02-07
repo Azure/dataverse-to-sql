@@ -657,6 +657,42 @@ namespace DataverseToSql.Core.Jobs
 
             var blobUriBuilder = new BlobUriBuilder(environment.Config.DataverseStorage.ContainerUri());
 
+            blobUriBuilder.BlobName = "Microsoft.Athena.TrickleFeedService/*-EntityMetadata.json";
+            optionsetTables.Add(new Dictionary<string, object>
+            {
+                ["optionsetTable"] = "AttributeMetadata",
+                ["serverlessQuery"] = $@"
+                    SELECT
+	                    0 [Id],
+	                    [EntityName],
+	                    [AttributeName],
+	                    [AttributeType],
+	                    [AttributeTypeCode],
+	                    [Version],
+	                    [Timestamp],
+	                    [MetadataId],
+	                    [Precision]
+                    FROM 
+	                    OPENROWSET(
+                            BULK '{blobUriBuilder.ToUri().ToString().Replace("%2A-EntityMetadata.json", "*-EntityMetadata.json")}',
+                            FORMAT = 'csv',
+                            FIELDTERMINATOR ='0x0b',
+                            FIELDQUOTE = '0x0b',
+                            ROWTERMINATOR = '0x0b'
+                        ) WITH (doc nvarchar(max)) as rows
+	                    CROSS APPLY OPENJSON(doc, '$.AttributeMetadata') WITH (
+		                    [EntityName] [nvarchar](64),
+		                    [AttributeName] [nvarchar](64),
+		                    [AttributeType] [nvarchar](64),
+		                    [AttributeTypeCode] [int],
+		                    [Version] [bigint],
+		                    [Timestamp] [datetime],
+		                    [MetadataId] [nvarchar](64),
+		                    [Precision] [int],		
+		                    [MaxLength] [int]
+	                    )"
+            });
+
             blobUriBuilder.BlobName = "OptionsetMetadata/OptionsetMetadata.csv";
             optionsetTables.Add(new Dictionary<string, object>
             {
