@@ -387,73 +387,88 @@ namespace DataverseToSql.Core.Jobs
 
             var newData = false;
 
-            // Process each blob separately
-            foreach (var managedBlob in managedBlobs.OrderBy(mb => mb.Name))
+            // Group managed blobs belonging to the same entity together to process them
+            // using a single serverless query.
+            // The goal is reducing the number of pipeline activities used to process a
+            // single entity.
+            foreach (var managedBlobGroup in managedBlobs.GroupBy(mb => mb.Entity.Name))
             {
-                var sourceBlobUri = new BlobUriBuilder(environment.Config.DataverseStorage.ContainerUri())
+                var managedBlobGroupName = $"{managedBlobGroup.Key}_{ingestionTimestamp}";
+                var targetBlobUris = new List<Uri>();
+
+                // Process each blob separately
+                foreach (var managedBlob in managedBlobGroup.OrderBy(mb => mb.Name))
                 {
-                    BlobName = $"{managedEntity.Name}/{managedBlob.Name}"
-                }.ToUri();
-
-                var blockClient = new BlockBlobClient(
-                    sourceBlobUri,
-                    environment.Credential
-                    );
-
-                var currentBlobSize = (await blockClient.GetPropertiesAsync(cancellationToken: cancellationToken)).Value.ContentLength;
-
-                // Check if there are new data in the blob by comparing the current size with the previously
-                // stored size (offset). Since the partition is append-only, a bigger blob means new data.
-                // If there are new data, copy them to a separate blob that will later be ingested by the
-                // dedicated Synapse pipeline.
-                if (currentBlobSize > managedBlob.Offset)
-                {
-                    newData = true;
-
-                    var newBlockSize = currentBlobSize - managedBlob.Offset;
-
-                    var targetBlobName = string.Format(
-                        "{0}_{1}.csv",
-                        Path.GetFileNameWithoutExtension(managedBlob.Name),
-                        ingestionTimestamp);
-
-                    var targetBlobUri = new BlobUriBuilder(environment.Config.IncrementalStorage.ContainerUri())
+                    var sourceBlobUri = new BlobUriBuilder(environment.Config.DataverseStorage.ContainerUri())
                     {
-                        BlobName = $"{managedEntity.Name}/{targetBlobName}"
+                        BlobName = $"{managedEntity.Name}/{managedBlob.Name}"
                     }.ToUri();
 
-                    log.LogInformation("Entity {entity}: copying {bytes} bytes from {sourceUri} to {targetUri}.",
-                        managedEntity.Name,
-                        newBlockSize,
-                        sourceBlobUri.ToString(),
-                        targetBlobUri.ToString());
-
-                    var targetBlockClient = new BlockBlobClient(
-                        targetBlobUri,
-                        environment.Credential);
-
-                    // Copy the new block of data at the end of the blob
-                    // to the target blob.
-                    await targetBlockClient.CopyRangeFromUriAsync(
+                    var blockClient = new BlockBlobClient(
                         sourceBlobUri,
-                        sourceAuthentication,
-                        managedBlob.Offset,
-                        newBlockSize,
-                        cancellationToken: cancellationToken);
+                        environment.Credential
+                        );
 
-                    managedBlob.Offset = currentBlobSize;
-                    await environment.database.UpsertAsync(managedBlob, cancellationToken);
+                    var currentBlobSize = (await blockClient.GetPropertiesAsync(cancellationToken: cancellationToken)).Value.ContentLength;
 
+                    // Check if there are new data in the blob by comparing the current size with the previously
+                    // stored size (offset). Since the partition is append-only, a bigger blob means new data.
+                    // If there are new data, copy them to a separate blob that will later be ingested by the
+                    // dedicated Synapse pipeline.
+                    if (currentBlobSize > managedBlob.Offset)
+                    {
+                        newData = true;
+
+                        var newBlockSize = currentBlobSize - managedBlob.Offset;
+
+                        var targetBlobName = string.Format(
+                            "{0}_{1}.csv",
+                            Path.GetFileNameWithoutExtension(managedBlob.Name),
+                            ingestionTimestamp);
+
+                        var targetBlobUri = new BlobUriBuilder(environment.Config.IncrementalStorage.ContainerUri())
+                        {
+                            BlobName = $"{managedEntity.Name}/{targetBlobName}"
+                        }.ToUri();
+
+                        log.LogInformation("Entity {entity}: copying {bytes} bytes from {sourceUri} to {targetUri}.",
+                            managedEntity.Name,
+                            newBlockSize,
+                            sourceBlobUri.ToString(),
+                            targetBlobUri.ToString());
+
+                        var targetBlockClient = new BlockBlobClient(
+                            targetBlobUri,
+                            environment.Credential);
+
+                        // Copy the new block of data at the end of the blob
+                        // to the target blob.
+                        await targetBlockClient.CopyRangeFromUriAsync(
+                            sourceBlobUri,
+                            sourceAuthentication,
+                            managedBlob.Offset,
+                            newBlockSize,
+                            cancellationToken: cancellationToken);
+
+                        managedBlob.Offset = currentBlobSize;
+                        await environment.database.UpsertAsync(managedBlob, cancellationToken);
+
+                        targetBlobUris.Add(targetBlobUri);
+                    }
+                }
+
+                if (targetBlobUris.Count > 0)
+                {
                     // Generate the query to run in Serverless SQL pool to read
                     // and deduplicate the new data
                     var serverlessQuery = cdmEntity.GetIncrementalLoadServerlessQuery(
-                        new List<Uri>() { targetBlobUri }, 
+                        targetBlobUris,
                         targetColumns);
 
                     // Record the metadata of the blob for ingestion
                     await environment.database.InsertAsync(new BlobToIngest(
                         managedEntity,
-                        targetBlobName,
+                        managedBlobGroupName,
                         environment.Config.Database.Schema,
                         managedEntity.Name,
                         serverlessQuery,
@@ -462,6 +477,7 @@ namespace DataverseToSql.Core.Jobs
                         cancellationToken);
                 }
             }
+
             if (!newData)
                 log.LogInformation("Entity {entity}: no new data.", managedEntity.Name);
         }
