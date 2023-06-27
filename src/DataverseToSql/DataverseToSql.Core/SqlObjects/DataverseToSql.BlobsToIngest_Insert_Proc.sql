@@ -4,9 +4,7 @@
 CREATE PROCEDURE [DataverseToSql].[BlobsToIngest_Insert]
 	@EntityName [DataverseToSql].[EntityType],
 	@BlobName [DataverseToSql].[BlobNameType],
-	@TargetSchema SYSNAME,
-	@TargetTable SYSNAME,
-	@ServerlessQuery NVARCHAR(MAX),
+	@Partition [DataverseToSql].[BlobPartitionType],
 	@LoadType INT
 AS
 IF NOT EXISTS (
@@ -19,17 +17,13 @@ BEGIN
 	INSERT INTO [DataverseToSql].[BlobsToIngest](
 		[EntityName],
 		[BlobName],
-		[TargetSchema],
-		[TargetTable],
-		[ServerlessQuery],
+		[Partition],
 		[LoadType]
 	)
 	VALUES (
 		@EntityName,
 		@BlobName,
-		@TargetSchema,
-		@TargetTable,
-		@ServerlessQuery,
+		@Partition,
 		@LoadType
 	)
 END

@@ -9,7 +9,10 @@ using Microsoft.Extensions.Logging;
 using Microsoft.SqlServer.Dac;
 using Microsoft.SqlServer.Dac.Model;
 using Microsoft.SqlServer.TransactSql.ScriptDom;
+using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
+using System.Threading;
 
 namespace DataverseToSql.Core
 {
@@ -59,11 +62,10 @@ namespace DataverseToSql.Core
 
                     _model.AddObjects(SqlObjects.DataverseToSql_BlobsToIngest_Table);
                     _model.AddObjects(SqlObjects.DataverseToSql_BlobsToIngest_Insert_Proc);
-                    _model.AddObjects(SqlObjects.DataverseToSql_BlobsToIngest_Get_Proc);
-                    _model.AddObjects(SqlObjects.DataverseToSql_BlobsToIngest_GetDetails_Proc);
-                    _model.AddObjects(SqlObjects.DataverseToSql_BlobsToIngest_Complete_Proc);
 
-                    _model.AddObjects(SqlObjects.DataverseToSql_FullLoad_Complete_Proc);
+                    _model.AddObjects(SqlObjects.DataverseToSql_IngestionJobs_Get_Proc);
+                    _model.AddObjects(SqlObjects.DataverseToSql_IngestionJobs_Complete_Proc);
+                    _model.AddObjects(SqlObjects.DataverseToSql_ServerlessQuery_Func);
 
                     _model.AddObjects(SqlObjects.DataverseToSql_ManagedCustomScripts_Table);
                     _model.AddObjects(SqlObjects.DataverseToSql_ManagedCustomScripts_Upsert_Proc);
@@ -295,12 +297,20 @@ namespace DataverseToSql.Core
             cmd.CommandType = CommandType.StoredProcedure;
             cmd.CommandText = "[DataverseToSql].[ManagedEntities_Upsert]";
             cmd.Parameters.Add(new() { ParameterName = "@EntityName" });
+            cmd.Parameters.Add(new() { ParameterName = "@TargetSchema" });
+            cmd.Parameters.Add(new() { ParameterName = "@TargetTable" });
             cmd.Parameters.Add(new() { ParameterName = "@State" });
             cmd.Parameters.Add(new() { ParameterName = "@SchemaHash" });
+            cmd.Parameters.Add(new() { ParameterName = "@InnerQuery" });
+            cmd.Parameters.Add(new() { ParameterName = "@OpenrowsetQuery" });
 
             cmd.Parameters["@EntityName"].Value = managedEntity.Name;
+            cmd.Parameters["@TargetSchema"].Value = managedEntity.TargetSchema;
+            cmd.Parameters["@TargetTable"].Value = managedEntity.TargetTable;
             cmd.Parameters["@State"].Value = managedEntity.State;
             cmd.Parameters["@SchemaHash"].Value = managedEntity.SchemaHash;
+            cmd.Parameters["@InnerQuery"].Value = managedEntity.InnerQuery;
+            cmd.Parameters["@OpenrowsetQuery"].Value = managedEntity.OpenrowsetQuery;
 
             await cmd.ExecuteNonQueryAsync(cancellationToken);
             conn.Close();
@@ -419,27 +429,99 @@ namespace DataverseToSql.Core
             return result;
         }
 
-        internal async Task InsertAsync(BlobToIngest blob, CancellationToken cancellationToken)
+        internal async Task<IList<(long Id, string BlobName)>> GetCompletedBlobsToIngest(CancellationToken cancellationToken)
         {
             var conn = await GetSqlConnectionAsync(cancellationToken);
+            var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT [Id], [BlobName] FROM [DataverseToSql].[BlobsToIngest] WHERE [Complete] = 1;";
+
+            List<(long Id, string BlobName)> completedBlobs = new();
+
+            var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                completedBlobs.Add(
+                    new(reader.GetInt64(0), reader.GetString(1)));
+            }
+            reader.Close();
+            conn.Close();
+
+            return completedBlobs;
+        }
+
+        internal async Task<bool> AreBlobsPendingIngestion(CancellationToken cancellationToken)
+        {
+            var conn = await GetSqlConnectionAsync(cancellationToken);
+            var cmd = conn.CreateCommand();
+
+            cmd.CommandText = string.Format(
+                "SELECT TOP 1 1 FROM [DataverseToSql].[BlobsToIngest] WHERE [Complete] = 0;"
+                );
+
+            var result = await cmd.ExecuteScalarAsync(cancellationToken);
+            conn.Close();
+
+            return result is int value && value == 1;
+        }
+
+        internal async Task DeleteBlobToIngest(long id, CancellationToken cancellationToken)
+        {
+            var conn = await GetSqlConnectionAsync(cancellationToken);
+            var cmd = conn.CreateCommand();
+            cmd.CommandText = "DELETE [DataverseToSql].[BlobsToIngest] WHERE [Id] = @Id;";
+            cmd.Parameters.Add(new() { ParameterName = "@Id" });
+            cmd.Parameters["@Id"].Value = id;
+
+            await cmd.ExecuteNonQueryAsync(cancellationToken);
+
+            conn.Close();
+        }
+
+        internal async Task InsertAsync(IEnumerable<BlobToIngest> blobs, CancellationToken cancellationToken)
+        {
+            var conn = await GetSqlConnectionAsync(cancellationToken);
+
             var cmd = conn.CreateCommand();
             cmd.CommandType = CommandType.StoredProcedure;
             cmd.CommandText = "[DataverseToSql].[BlobsToIngest_Insert]";
             cmd.Parameters.Add(new() { ParameterName = "@EntityName" });
             cmd.Parameters.Add(new() { ParameterName = "@BlobName" });
-            cmd.Parameters.Add(new() { ParameterName = "@TargetSchema" });
-            cmd.Parameters.Add(new() { ParameterName = "@TargetTable" });
-            cmd.Parameters.Add(new() { ParameterName = "@ServerlessQuery" });
+            cmd.Parameters.Add(new() { ParameterName = "@Partition" });
             cmd.Parameters.Add(new() { ParameterName = "@LoadType" });
 
-            cmd.Parameters["@EntityName"].Value = blob.Entity.Name;
-            cmd.Parameters["@BlobName"].Value = blob.Name;
-            cmd.Parameters["@TargetSchema"].Value = blob.TargetSchema;
-            cmd.Parameters["@TargetTable"].Value = blob.TargetTable;
-            cmd.Parameters["@ServerlessQuery"].Value = blob.ServerlessQuery;
-            cmd.Parameters["@LoadType"].Value = (int)blob.LoadType;
+            SqlTransaction? transaction = null;
 
-            await cmd.ExecuteNonQueryAsync(cancellationToken);
+            try
+            {
+                transaction = await conn.BeginTransactionAsync(cancellationToken) as SqlTransaction;
+
+                cmd.Transaction = transaction;
+
+                foreach (var blob in blobs)
+                {
+                    cmd.Parameters["@EntityName"].Value = blob.Entity.Name;
+                    cmd.Parameters["@BlobName"].Value = blob.Name;
+                    cmd.Parameters["@Partition"].Value = blob.Partition;
+                    cmd.Parameters["@LoadType"].Value = (int)blob.LoadType;
+                    await cmd.ExecuteNonQueryAsync(cancellationToken);
+                }
+
+                if (transaction is not null)
+                    await transaction.CommitAsync(cancellationToken);
+            }
+            catch (Exception)
+            {
+                try
+                {
+                    if (transaction is not null)
+                        await transaction.RollbackAsync(cancellationToken);
+                }
+                catch (Exception)
+                { }
+
+                throw;
+            }
+
             conn.Close();
         }
 
@@ -465,11 +547,11 @@ namespace DataverseToSql.Core
         }
 
         internal async Task<List<string>> GetTableTypeColumnsAsync(
-            string tableName, 
+            string tableName,
             CancellationToken cancellationToken)
         {
             var conn = await GetSqlConnectionAsync(cancellationToken);
-            
+
             var cmd = conn.CreateCommand();
             cmd.CommandText = "SELECT c.[name] FROM sys.columns c " +
                 "INNER JOIN sys.table_types tt ON c.object_id = tt.type_table_object_id " +

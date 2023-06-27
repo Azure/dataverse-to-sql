@@ -64,86 +64,10 @@ namespace DataverseToSql.Core {
         ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
         ///-- Licensed under the MIT License.
         ///
-        ///CREATE PROCEDURE [DataverseToSql].[BlobsToIngest_Complete]
-        ///	@EntityName [DataverseToSql].[EntityType],
-        ///	@BlobName [DataverseToSql].[BlobNameType]
-        ///AS
-        ///
-        ///-- Set complete to 1 if the blob load type is &quot;full&quot;
-        ///UPDATE	[DataverseToSql].[BlobsToIngest]
-        ///SET		[Complete] = 1
-        ///WHERE
-        ///		[EntityName] = @EntityName
-        ///		AND [BlobName] = @BlobName
-        ///		AND [LoadType] = 0 -- Full
-        ///
-        ///-- Delete the blob record if the load is &quot;incremental&quot;
-        ///DELETE	 [rest of string was truncated]&quot;;.
-        /// </summary>
-        internal static string DataverseToSql_BlobsToIngest_Complete_Proc {
-            get {
-                return ResourceManager.GetString("DataverseToSql_BlobsToIngest_Complete_Proc", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
-        ///-- Licensed under the MIT License.
-        ///
-        ///CREATE PROCEDURE [DataverseToSql].[BlobsToIngest_Get]
-        ///AS
-        ///SELECT
-        ///	[EntityName],
-        ///	[BlobName]
-        ///FROM
-        ///	[DataverseToSql].[BlobsToIngest]
-        ///WHERE
-        ///	[Complete] = 0
-        ///ORDER BY
-        ///	[BlobName].
-        /// </summary>
-        internal static string DataverseToSql_BlobsToIngest_Get_Proc {
-            get {
-                return ResourceManager.GetString("DataverseToSql_BlobsToIngest_Get_Proc", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
-        ///-- Licensed under the MIT License.
-        ///
-        ///CREATE PROCEDURE [DataverseToSql].[BlobsToIngest_GetDetails]
-        ///	@EntityName [DataverseToSql].[EntityType],
-        ///	@BlobName [DataverseToSql].[BlobNameType]
-        ///AS
-        ///SELECT
-        ///	[TargetSchema],
-        ///	[TargetTable],
-        ///	[ServerlessQuery],
-        ///	[LoadType]
-        ///FROM
-        ///	[DataverseToSql].[BlobsToIngest]
-        ///WHERE
-        ///	[EntityName] = @EntityName
-        ///	AND [BlobName] = @BlobName
-        ///ORDER BY
-        ///	[BlobName].
-        /// </summary>
-        internal static string DataverseToSql_BlobsToIngest_GetDetails_Proc {
-            get {
-                return ResourceManager.GetString("DataverseToSql_BlobsToIngest_GetDetails_Proc", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
-        ///-- Licensed under the MIT License.
-        ///
         ///CREATE PROCEDURE [DataverseToSql].[BlobsToIngest_Insert]
         ///	@EntityName [DataverseToSql].[EntityType],
         ///	@BlobName [DataverseToSql].[BlobNameType],
-        ///	@TargetSchema SYSNAME,
-        ///	@TargetTable SYSNAME,
+        ///	@Partition [DataverseToSql].[BlobPartitionType],
         ///	@ServerlessQuery NVARCHAR(MAX),
         ///	@LoadType INT
         ///AS
@@ -154,7 +78,7 @@ namespace DataverseToSql.Core {
         ///		AND [BlobName] = @BlobName
         ///)
         ///BEGIN
-        ///	INSERT INTO [DataverseToSql].[BlobsTo [rest of string was truncated]&quot;;.
+        ///	INSERT INTO [DataverseToSql].[Blobs [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string DataverseToSql_BlobsToIngest_Insert_Proc {
             get {
@@ -167,15 +91,14 @@ namespace DataverseToSql.Core {
         ///-- Licensed under the MIT License.
         ///
         ///CREATE TABLE [DataverseToSql].[BlobsToIngest] (
-        ///	[Id] INT IDENTITY PRIMARY KEY,
+        ///	[Id] BIGINT IDENTITY PRIMARY KEY,
         ///	[EntityName] [DataverseToSql].[EntityType] NOT NULL,
         ///	[BlobName] [DataverseToSql].[BlobNameType] NOT NULL,
-        ///	[TargetSchema] SYSNAME NOT NULL,
-        ///	[TargetTable] SYSNAME NOT NULL,
-        ///	[ServerlessQuery] NVARCHAR(MAX) NOT NULL,
-        ///	[LoadType] INT NOT NULL,
+        ///	[Partition] [DataverseToSql].[BlobPartitionType] NOT NULL,
+        ///	[LoadType] INT NOT NULL, -- Full=0, Incremental=1 (from LoadType enum)
         ///	[Complete] INT NOT NULL DEFAULT 0,
-        ///	CONSTRAINT UQ_BlobsToIngest UNIQUE ([EntityName], [BlobName]),        /// [rest of string was truncated]&quot;;.
+        ///	CONSTRAINT UQ_BlobsToIngest UNIQUE ([EntityName], [BlobName]),
+        ///	C [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string DataverseToSql_BlobsToIngest_Table {
             get {
@@ -187,31 +110,58 @@ namespace DataverseToSql.Core {
         ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
         ///-- Licensed under the MIT License.
         ///
-        ///CREATE PROCEDURE [DataverseToSql].[FullLoad_Complete]
+        ///CREATE PROCEDURE [DataverseToSql].[IngestionJobs_Complete]
+        ///	@JobId [DataverseToSql].[JobIdType]
         ///AS
-        ///BEGIN TRAN
         ///
-        ///DECLARE @CompletedEntities TABLE(
-        ///	[EntityName] [DataverseToSql].[EntityType]
-        ///)
+        ///UPDATE	a
+        ///SET
+        ///	[Complete] = 1
+        ///FROM
+        ///	[DataverseToSql].[BlobsToIngest] a
+        ///	INNER JOIN [DataverseToSql].[BlobsToIngest] b
+        ///		ON a.[Id] &lt;= b.Id
+        ///		AND a.[EntityName] = b.[EntityName]
+        ///		AND a.[LoadType] = b.[LoadType]
+        ///		and a.[Partition] = b.[Partition]
+        ///WHERE
+        ///	b.[Id] = @JobId.
+        /// </summary>
+        internal static string DataverseToSql_IngestionJobs_Complete_Proc {
+            get {
+                return ResourceManager.GetString("DataverseToSql_IngestionJobs_Complete_Proc", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
         ///
-        ///UPDATE [DataverseToSql].[ManagedEntities]
-        ///SET [State] = 3 -- Ready
-        ///OUTPUT inserted.[EntityName] 
-        ///	INTO @CompletedEntities
-        ///WHERE [EntityName] IN (
+        ///CREATE PROCEDURE [DataverseToSql].[IngestionJobs_Get]
+        ///AS
+        ///
+        ///WITH numbered_blobs AS (
         ///	SELECT
-        ///		[EntityName]
+        ///		*,
+        ///		ROW_NUMBER() OVER (PARTITION BY [EntityName] ORDER BY [BlobName]) AS blob_number
         ///	FROM
         ///		[DataverseToSql].[BlobsToIngest]
-        ///	GROUP BY
-        ///		[EntityName]
-        ///	HAVING
-        ///		MIN([Complete]) =  [rest of string was truncated]&quot;;.
+        ///	WHERE
+        ///		b.[Complete] = 0
+        ///),
+        ///incremental_jobs AS (
+        ///	SELECT
+        ///		MAX(b.[Id]) AS [JobId],
+        ///		[DataverseToSql].[ServerlessQuery](
+        ///			-- OPENROWSET queries
+        ///			STRING_AGG(
+        ///				REPLACE (
+        ///					REPLACE (
+        ///	 [rest of string was truncated]&quot;;.
         /// </summary>
-        internal static string DataverseToSql_FullLoad_Complete_Proc {
+        internal static string DataverseToSql_IngestionJobs_Get_Proc {
             get {
-                return ResourceManager.GetString("DataverseToSql_FullLoad_Complete_Proc", resourceCulture);
+                return ResourceManager.GetString("DataverseToSql_IngestionJobs_Get_Proc", resourceCulture);
             }
         }
         
@@ -318,7 +268,11 @@ namespace DataverseToSql.Core {
         ///CREATE TABLE [DataverseToSql].[ManagedEntities] (
         ///	[EntityName] [DataverseToSql].[EntityType] NOT NULL PRIMARY KEY,
         ///	[State] INT NOT NULL,
-        ///	[SchemaHash] NVARCHAR(128) NULL
+        ///	[SchemaHash] NVARCHAR(128) NULL,
+        ///	[TargetSchema] SYSNAME NOT NULL,
+        ///	[TargetTable] SYSNAME NOT NULL,
+        ///	[InnerQuery] NVARCHAR(MAX) NULL,
+        ///	[OpenrowsetQuery] NVARCHAR(MAX) NULL
         ///).
         /// </summary>
         internal static string DataverseToSql_ManagedEntities_Table {
@@ -333,24 +287,19 @@ namespace DataverseToSql.Core {
         ///
         ///CREATE PROCEDURE [DataverseToSql].[ManagedEntities_Upsert]
         ///	@EntityName [DataverseToSql].[EntityType],
+        ///	@TargetSchema SYSNAME,
+        ///	@TargetTable SYSNAME,
         ///	@State INT = NULL,
-        ///	@SchemaHash NVARCHAR(128) = NULL
+        ///	@SchemaHash NVARCHAR(128) = NULL,
+        ///	@InnerQuery NVARCHAR(MAX) = NULL,
+        ///	@OpenrowsetQuery NVARCHAR(MAX) = NULL
         ///AS
         ///IF NOT EXISTS (
         ///	SELECT * FROM [DataverseToSql].[ManagedEntities]
         ///	WHERE [EntityName] = @EntityName
         ///)
         ///BEGIN
-        ///	INSERT INTO [DataverseToSql].[ManagedEntities](
-        ///		[EntityName],
-        ///		[State],
-        ///		[SchemaHash]
-        ///	)
-        ///	VALUES (
-        ///		@EntityName,
-        ///		@State,
-        ///		@SchemaHash
-        ///	)        /// [rest of string was truncated]&quot;;.
+        ///	INSERT INTO [DataverseToSql] [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string DataverseToSql_ManagedEntities_Upsert_Proc {
             get {
@@ -374,6 +323,36 @@ namespace DataverseToSql.Core {
         ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
         ///-- Licensed under the MIT License.
         ///
+        ///CREATE FUNCTION [DataverseToSql].[ServerlessQuery]
+        ///(
+        ///	@OpenrowsetQueries nvarchar(max),
+        ///	@InnerQuery nvarchar(max),
+        ///	@ExcludeDeletedRecords bit
+        ///)
+        ///RETURNS nvarchar(max)
+        ///BEGIN
+        ///	SET @InnerQuery = REPLACE(
+        ///		@InnerQuery,
+        ///		&apos;&lt;&lt;&lt;OPENROWSET_PLACEHOLDER&gt;&gt;&gt;&apos;,
+        ///		@OpenrowsetQueries)
+        ///
+        ///	IF @ExcludeDeletedRecords = 1
+        ///	BEGIN
+        ///		SET @InnerQuery = @InnerQuery + &apos; WHERE ISNULL(IsDelete, &apos;&apos;False&apos;&apos;) &lt;&gt; &apos;&apos;True&apos;&apos;&apos;
+        ///	END
+        ///
+        ///	DECLARE @Form [rest of string was truncated]&quot;;.
+        /// </summary>
+        internal static string DataverseToSql_ServerlessQuery_Func {
+            get {
+                return ResourceManager.GetString("DataverseToSql_ServerlessQuery_Func", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
+        ///-- Licensed under the MIT License.
+        ///
         ///CREATE TYPE [DataverseToSql].[EntityType]
         ///	FROM NVARCHAR(128);
         ///GO
@@ -385,7 +364,14 @@ namespace DataverseToSql.Core {
         ///CREATE TYPE [DataverseToSql].[CustomScriptNameType]
         ///	FROM NVARCHAR(512);
         ///GO
-        ///.
+        ///
+        ///CREATE TYPE [DataverseToSql].[BlobPartitionType]
+        ///	FROM NVARCHAR(512);
+        ///GO
+        ///
+        ///CREATE TYPE [DataverseToSql].[JobIdType]
+        ///	FROM BIGINT;
+        ///GO.
         /// </summary>
         internal static string DataverseToSql_Types {
             get {
@@ -406,12 +392,12 @@ namespace DataverseToSql.Core {
         ///	[Version] [bigint] NULL,
         ///	[Timestamp] [datetime] NULL,
         ///	[MetadataId] [nvarchar](64) NULL,
-        ///	[Precision] [int] NULL,
+        ///	[Precision] [int] NULL
         ///);
         ///GO
         ///
         ///CREATE TYPE [DataverseToSql].[AttributeMetadata_TableType] AS TABLE (
-        ///	[Id] [bigint [rest of string was truncated]&quot;;.
+        ///	[Id] [bigint] [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string Optionsets_AttributeMetadata {
             get {

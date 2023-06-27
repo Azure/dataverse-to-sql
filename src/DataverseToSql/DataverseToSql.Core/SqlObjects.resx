@@ -118,23 +118,17 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
-  <data name="DataverseToSql_BlobsToIngest_Complete_Proc" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>sqlobjects\dataversetosql.blobstoingest_complete_proc.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
-  </data>
-  <data name="DataverseToSql_BlobsToIngest_GetDetails_Proc" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>sqlobjects\dataversetosql.blobstoingest_getdetails_proc.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
-  </data>
-  <data name="DataverseToSql_BlobsToIngest_Get_Proc" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>sqlobjects\dataversetosql.blobstoingest_get_proc.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
-  </data>
   <data name="DataverseToSql_BlobsToIngest_Insert_Proc" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>sqlobjects\dataversetosql.blobstoingest_insert_proc.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
   </data>
   <data name="DataverseToSql_BlobsToIngest_Table" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>sqlobjects\dataversetosql.blobstoingest_table.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
   </data>
-  <data name="DataverseToSql_FullLoad_Complete_Proc" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>sqlobjects\dataversetosql.fullload_complete_proc.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
+  <data name="DataverseToSql_IngestionJobs_Complete_Proc" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>SqlObjects\DataverseToSql.IngestionJobs_Complete_Proc.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;Windows-1252</value>
+  </data>
+  <data name="DataverseToSql_IngestionJobs_Get_Proc" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>SqlObjects\DataverseToSql.IngestionJobs_Get_Proc.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
   </data>
   <data name="DataverseToSql_ManagedBlobs_Table" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>sqlobjects\dataversetosql.managedblobs_table.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
@@ -156,6 +150,9 @@
   </data>
   <data name="DataverseToSql_Schema" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>sqlobjects\dataversetosql_schema.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
+  </data>
+  <data name="DataverseToSql_ServerlessQuery_Func" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>SqlObjects\DataverseToSql.ServerlessQuery_Func.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;Windows-1252</value>
   </data>
   <data name="DataverseToSql_Types" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>sqlobjects\dataversetosql.types.sql;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>

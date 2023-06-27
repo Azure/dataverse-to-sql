@@ -126,50 +126,31 @@ namespace DataverseToSql.Core
             return sb.ToString();
         }
 
-        // Return the Serverless SQL Pool query to read the specified blob during 
-        // full load (used in initial load of new entities)
-        internal static string GetFullLoadServerlessQuery(
-            this CdmEntity entity,
-            IList<Uri> blobUris,
-            IList<string> targetColumns) =>
-            entity.GetServerlessQueryInternal(blobUris, targetColumns, includeDeletedRecords: false);
-
-        // Return the Serverless SQL Pool query to read the specified blob during 
-        // incremental load
-        internal static string GetIncrementalLoadServerlessQuery(
-            this CdmEntity entity,
-            IList<Uri> blobUris,
-            IList<string> targetColumns) =>
-            entity.GetServerlessQueryInternal(blobUris, targetColumns, includeDeletedRecords: true);
-
-        private static string GetServerlessQueryInternal(
-            this CdmEntity entity,
-            IList<Uri> blobUris,
-            IList<string> targetColumns,
-            bool includeDeletedRecords)
+        public static string GetServerlessOpenrowsetQuery(
+            this CdmEntity entity)
         {
-            if (blobUris.Count == 0)
-            {
-                throw new Exception("Expected one or more blob URIs to generate the serverless query");
-            }
+            var sourceColumns = string.Join(",", entity.Attributes.Select(attr => attr.SqlColumnDef(serverless: true)));
 
+            return $@"
+                    SELECT  *
+                    FROM    OPENROWSET(BULK ( N'<<<BLOB_PLACEHOLDER>>>' ),
+                            FORMAT = 'csv', FIELDTERMINATOR  = ',', FIELDQUOTE = '""')
+                            WITH ({sourceColumns}) AS T<<<ORDINAL_PLACEHOLDER>>>";
+        }
+
+        public static string GetServerlessInnerQuery(
+            this CdmEntity entity,
+            IList<string> targetColumns)
+        {
             var sourceColumns = string.Join(",", entity.Attributes.Select(attr => attr.SqlColumnDef(serverless: true)));
             var primaryKeyCols = entity.PrimaryKeyAttributes.Select(a => a.SqlColumnName()).ToList();
             var primaryKeyString = string.Join(",", primaryKeyCols);
             var primaryKeyJoinPredicates = string.Join(" AND ", primaryKeyCols.Select(c => $"s.{c} = r.{c}"));
             var targetColumnList = string.Join(",", targetColumns.Select(c => $"[{c}]"));
 
-            var openrowSetQueries = string.Join(" UNION ALL ",
-                blobUris.Select((blobUri, index) => $@"
-                    SELECT  *
-                    FROM    OPENROWSET(BULK ( N'{blobUri}' ),
-                            FORMAT = 'csv', FIELDTERMINATOR  = ',', FIELDQUOTE = '""')
-                            WITH ({sourceColumns}) AS T{index}
-                    "));
-
             var innerQuery = $@"                
                 WITH cte_openrowset AS (
-                    {openrowSetQueries}
+                    <<<OPENROWSET_PLACEHOLDER>>>
                 ),
                 cte_source AS (
                     SELECT TOP <<<TOP_PLACEHOLDER>>> *
@@ -195,28 +176,9 @@ namespace DataverseToSql.Core
                     {targetColumnList}
                 FROM
                     cte_most_recent_records            
-                "
-                + (includeDeletedRecords ? "" : "WHERE ISNULL(IsDelete, 'False') <> 'True'");
-
-            var formattedInnerQuery = innerQuery
-                .Replace("'", "''")
-                .Replace("<<<TOP_PLACEHOLDER>>>", "' + CAST(@rowcount AS nvarchar(max)) + N'");
-
-            var outerQuery = $@"
-                DECLARE @rowcount bigint
-
-                WITH cte_openrowset AS (
-                    {openrowSetQueries}
-                )
-                SELECT  @rowcount=count(*)
-                FROM    cte_openrowset
-
-                DECLARE @query nvarchar(max) = N'{formattedInnerQuery}'
-
-                EXEC sp_executesql @query
                 ";
 
-            return outerQuery;
+            return innerQuery;
         }
 
         // Return the SQL column definition of the CDM attribute

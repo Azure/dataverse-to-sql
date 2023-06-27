@@ -15,12 +15,14 @@ namespace DataverseToSql.Core.Model
             = ManagedEntityState.New;
         // BASE64 encoded SHA1 of the latest SQL schema deployed for the entity
         public string? SchemaHash { get; set; } = null;
-
-        // Name of the target SQL table data must be loaded to
-        public string TargetTableName()
-        {
-            return Name;
-        }
+        // Name of the schema containing the table in the target SQL database
+        public string TargetSchema { get; set; } = "";
+        // Name of the the table in the target SQL database
+        public string TargetTable { get; set; } = "";
+        // Serverless query for deduplication
+        public string? InnerQuery { get; set; } = null;
+        // Serverless OPENROWSET query
+        public string? OpenrowsetQuery { get; set; } = null;
     }
 
     public enum ManagedEntityState

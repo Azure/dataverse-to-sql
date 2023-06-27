@@ -12,17 +12,13 @@ namespace DataverseToSql.Core.Model
         internal BlobToIngest(
             ManagedEntity entity,
             string name,
-            string targetSchema,
-            string targetTable,
-            string serverlessQuery,
+            string partition,
             LoadType loadType
             )
         {
             Entity = entity;
             Name = name;
-            TargetSchema = targetSchema;
-            TargetTable = targetTable;
-            ServerlessQuery = serverlessQuery;
+            Partition = partition;
             LoadType = loadType;
         }
 
@@ -30,12 +26,8 @@ namespace DataverseToSql.Core.Model
         public ManagedEntity Entity { get; }
         // Name of the blob, as a relative path in the container
         public string Name { get; }
-        // Schema of the table the data are loaded to
-        public string TargetSchema { get; }
-        // Name of the table the data are loaded to
-        public string TargetTable { get; }
-        // Query to be executed in Serverless SQL Pool to read and deduplicate the source data
-        public string ServerlessQuery { get; }
+        // Name of the partition the blob belongs to
+        public string Partition { get; }
         // Type of load operation, either full or incremenetal
         public LoadType LoadType { get; }
     }
