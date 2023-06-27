@@ -28,13 +28,13 @@ namespace DataverseToSql.Core.Jobs
         private readonly ILogger log;
         private readonly EnvironmentBase environment;
 
-        private readonly string ingestionTimestamp;
+        private readonly DateTime ingestionTimestamp;
 
         public IngestionJob(ILogger log, EnvironmentBase environment)
         {
             this.log = log;
             this.environment = environment;
-            ingestionTimestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+            ingestionTimestamp = DateTime.UtcNow;
         }
 
         public async Task RunAsync(CancellationToken cancellationToken = default)
@@ -262,6 +262,14 @@ namespace DataverseToSql.Core.Jobs
             }
         }
 
+        private Uri IncrementalBlobUri(ManagedEntity entity, string name)
+        {
+            return new BlobUriBuilder(environment.Config.IncrementalStorage.ContainerUri())
+            {
+                BlobName = $"{entity.Name}/{name}_{ingestionTimestamp.ToString("yyyyMMddHHmmss")}.csv"
+            }.ToUri();
+        }
+
         // Perform the initial load of a newly added entity
         private async Task InitialLoad(ManagedEntity managedEntity, CdmModel.CdmEntity cdmEntity, CancellationToken cancellationToken)
         {
@@ -304,10 +312,7 @@ namespace DataverseToSql.Core.Jobs
                         BlobName = $"{managedEntity.Name}/{partition.Name}.csv"
                     }.ToUri();
 
-                    var targetPartitionUri = new BlobUriBuilder(environment.Config.IncrementalStorage.ContainerUri())
-                    {
-                        BlobName = $"{managedEntity.Name}/{partition.Name}_{ingestionTimestamp}.csv"
-                    }.ToUri();
+                    var targetPartitionUri = IncrementalBlobUri(managedEntity, partition.Name);
 
                     // Copy the current partition data to the incremental storage
                     await CopyBlob(sourcePartitionUri, targetPartitionUri, cancellationToken);
@@ -428,15 +433,9 @@ namespace DataverseToSql.Core.Jobs
 
                     var newBlockSize = currentBlobSize - managedBlob.Offset;
 
-                    var targetBlobName = string.Format(
-                        "{0}_{1}.csv",
-                        Path.GetFileNameWithoutExtension(managedBlob.Name),
-                        ingestionTimestamp);
-
-                    var targetBlobUri = new BlobUriBuilder(environment.Config.IncrementalStorage.ContainerUri())
-                    {
-                        BlobName = $"{managedEntity.Name}/{targetBlobName}"
-                    }.ToUri();
+                    var targetBlobUri = IncrementalBlobUri(
+                        managedEntity, 
+                        Path.GetFileNameWithoutExtension(managedBlob.Name));
 
                     log.LogInformation("Entity {entity}: copying {bytes} bytes from {sourceUri} to {targetUri}.",
                         managedEntity.Name,
