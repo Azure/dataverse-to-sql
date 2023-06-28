@@ -2,9 +2,11 @@
 // Licensed under the MIT License.
 
 using Azure.Storage.Blobs;
+using Azure.Storage.Files.DataLake;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Newtonsoft.Json;
+using System.Text.RegularExpressions;
 
 namespace DataverseToSql.Core
 {
@@ -113,6 +115,23 @@ namespace DataverseToSql.Core
             {
                 BlobContainerName = Container
             }.ToUri();
+        }
+
+        private static readonly Regex blobUriRegex = new("^\\s*https://([a-zA-Z0-9]{3,24})\\.blob\\.core\\.windows\\.net/?");
+
+        // Datalake URI of the container
+        public Uri DatalakeUri()
+        {
+            var match = blobUriRegex.Match(StorageAccount);
+
+            if (!match.Success)
+            {
+                throw new ArgumentException($"Invalid storage URI: {StorageAccount}");
+            }
+
+            var datalakeUri = $"https://{match.Groups[1].Value}.dfs.core.windows.net/";
+
+            return new Uri(datalakeUri);
         }
 
         // Fill the configuration with placeholder values.

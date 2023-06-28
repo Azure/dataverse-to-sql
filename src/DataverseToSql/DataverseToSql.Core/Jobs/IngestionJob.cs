@@ -6,9 +6,11 @@ using Azure.Analytics.Synapse.Artifacts;
 using Azure.Analytics.Synapse.Artifacts.Models;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
+using Azure.Storage.Files.DataLake;
 using BlockBlobClientCopyRangeExtension;
 using DataverseToSql.Core.Model;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 
 namespace DataverseToSql.Core.Jobs
 {
@@ -88,7 +90,7 @@ namespace DataverseToSql.Core.Jobs
                                     await InitialLoad(managedEntity, cdmEntity, ct);
                                     break;
                                 case ManagedEntityState.Ready:
-                                    await IncrementalLoad(managedEntity, cdmEntity, ct);
+                                    await IncrementalLoad(managedEntity, ct);
                                     break;
                             }
                         }
@@ -113,8 +115,20 @@ namespace DataverseToSql.Core.Jobs
             }
         }
 
-        private async Task DeleteCompletedBlobsToIngestAsync(ParallelOptions parallelOps, CancellationToken cancellationToken)
+        private async Task DeleteCompletedBlobsToIngestAsync(
+            ParallelOptions parallelOps,
+            CancellationToken cancellationToken)
         {
+            log.LogInformation("Processing files to delete.");
+
+            var adslServiceClient = new DataLakeServiceClient(
+                environment.Config.IncrementalStorage.DatalakeUri(),
+                environment.Credential);
+
+            var fileSystemClient = adslServiceClient.GetFileSystemClient(environment.Config.IncrementalStorage.Container);
+
+            ConcurrentDictionary<string, int> directoriesToDelete = new();         
+
             await Parallel.ForEachAsync(
                 await environment.database.GetCompletedBlobsToIngest(cancellationToken),
                 parallelOps,
@@ -122,11 +136,27 @@ namespace DataverseToSql.Core.Jobs
                 {
                     log.LogInformation("Deleting completed incremental blob {incrementalBlobName}", blob.BlobName);
 
-                    var blobClient = new BlobClient(new Uri(blob.BlobName), environment.Credential);
-                    await blobClient.DeleteAsync(cancellationToken: cancellationToken);
+                    var blobUri = new Uri(blob.BlobName);
+                    var fileClient = fileSystemClient.GetFileClient(string.Join("", blobUri.Segments[2..]));
+                    await fileClient.DeleteIfExistsAsync(cancellationToken: ct);
 
-                    await environment.database.DeleteBlobToIngest(blob.Id, cancellationToken);
+                    directoriesToDelete[string.Join("", blobUri.Segments[2..^1])] = 1;
+
+                    await environment.database.DeleteBlobToIngest(blob.Id, ct);
                 });
+
+            foreach (var dir in directoriesToDelete.Keys)
+            {
+                var dirClient = fileSystemClient.GetDirectoryClient(dir);
+
+                if (await dirClient.ExistsAsync(cancellationToken)
+                    && ! await (dirClient.GetPathsAsync(cancellationToken: cancellationToken)
+                        .AnyAsync(cancellationToken: cancellationToken)))
+                {
+                    log.LogInformation("Deleting empty folder {incrementalFolder}", dirClient.Uri);
+                    await dirClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+                }
+            }
         }
 
         private async Task ProcessSchemaChanges(CancellationToken cancellationToken)
@@ -277,7 +307,7 @@ namespace DataverseToSql.Core.Jobs
         {
             return new BlobUriBuilder(environment.Config.IncrementalStorage.ContainerUri())
             {
-                BlobName = $"{entity.Name}/{FormattedTimestamp()}/{name}_{ingestionTimestamp.ToString("yyyyMMddHHmmss")}.csv"
+                BlobName = $"{entity.Name}/{FormattedTimestamp()}/{name}_{ingestionTimestamp:yyyyMMddHHmmss}.csv"
             }.ToUri();
         }
 
@@ -403,7 +433,7 @@ namespace DataverseToSql.Core.Jobs
         }
 
         // Perform the incremental load of an existing entity
-        private async Task IncrementalLoad(ManagedEntity managedEntity, CdmModel.CdmEntity cdmEntity, CancellationToken cancellationToken)
+        private async Task IncrementalLoad(ManagedEntity managedEntity, CancellationToken cancellationToken)
         {
             // Generate the Authorization header for the storage copy API.
             var sourceAuthentication = new HttpAuthorization(
@@ -447,7 +477,7 @@ namespace DataverseToSql.Core.Jobs
                     var newBlockSize = currentBlobSize - managedBlob.Offset;
 
                     var targetBlobUri = IncrementalBlobUri(
-                        managedEntity, 
+                        managedEntity,
                         Path.GetFileNameWithoutExtension(managedBlob.Name));
 
                     log.LogInformation("Entity {entity}: copying {bytes} bytes from {sourceUri} to {targetUri}.",
