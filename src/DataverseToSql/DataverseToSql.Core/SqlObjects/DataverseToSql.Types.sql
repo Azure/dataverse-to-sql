@@ -12,3 +12,15 @@ GO
 CREATE TYPE [DataverseToSql].[CustomScriptNameType]
 	FROM NVARCHAR(512);
 GO
+
+CREATE TYPE [DataverseToSql].[BlobPartitionType]
+	FROM NVARCHAR(512);
+GO
+
+CREATE TYPE [DataverseToSql].[JobIdType]
+	FROM BIGINT;
+GO
+
+CREATE TYPE [DataverseToSql].[TimestampType]
+	FROM NVARCHAR(14);
+GO

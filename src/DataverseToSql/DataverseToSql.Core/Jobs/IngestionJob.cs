@@ -6,6 +6,7 @@ using Azure.Analytics.Synapse.Artifacts;
 using Azure.Analytics.Synapse.Artifacts.Models;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
+using Azure.Storage.Files.DataLake;
 using BlockBlobClientCopyRangeExtension;
 using DataverseToSql.Core.Model;
 using Microsoft.Extensions.Logging;
@@ -27,13 +28,13 @@ namespace DataverseToSql.Core.Jobs
         private readonly ILogger log;
         private readonly EnvironmentBase environment;
 
-        private readonly string ingestionTimestamp;
+        private readonly DateTime ingestionTimestamp;
 
         public IngestionJob(ILogger log, EnvironmentBase environment)
         {
             this.log = log;
             this.environment = environment;
-            ingestionTimestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+            ingestionTimestamp = DateTime.UtcNow;
         }
 
         public async Task RunAsync(CancellationToken cancellationToken = default)
@@ -89,7 +90,7 @@ namespace DataverseToSql.Core.Jobs
                                     await InitialLoad(managedEntity, cdmEntity, ct);
                                     break;
                                 case ManagedEntityState.Ready:
-                                    await IncrementalLoad(managedEntity, cdmEntity, ct);
+                                    await IncrementalLoad(managedEntity, ct);
                                     break;
                             }
                         }
@@ -100,14 +101,61 @@ namespace DataverseToSql.Core.Jobs
                     });
 
                 // If there is any blob to be ingested, start the Synapse ingestion pipeline
-                if (!await environment.database.IsTableEmptyAsync(name: "BlobsToIngest", schema: "DataverseToSql", cancellationToken))
+                if (await environment.database.AreBlobsPendingIngestion(cancellationToken))
                     StartIngestionPipeline();
                 else
                     log.LogInformation("No new data to process. The ingestion pipeline will not be started.");
+
+                // Remove completed incremental blobs
+                await DeleteCompletedBlobsToIngestAsync(parallelOps, cancellationToken);
             }
             finally
             {
                 loadLock.Release();
+            }
+        }
+
+        private async Task DeleteCompletedBlobsToIngestAsync(
+            ParallelOptions parallelOps,
+            CancellationToken cancellationToken)
+        {
+            log.LogInformation("Processing files to delete.");
+
+            var adslServiceClient = new DataLakeServiceClient(
+                environment.Config.IncrementalStorage.DatalakeUri(),
+                environment.Credential);
+
+            var fileSystemClient = adslServiceClient.GetFileSystemClient(environment.Config.IncrementalStorage.Container);
+
+            ConcurrentDictionary<string, int> directoriesToDelete = new();         
+
+            await Parallel.ForEachAsync(
+                await environment.database.GetCompletedBlobsToIngest(cancellationToken),
+                parallelOps,
+                async (blob, ct) =>
+                {
+                    log.LogInformation("Deleting completed incremental blob {incrementalBlobName}", blob.BlobName);
+
+                    var blobUri = new Uri(blob.BlobName);
+                    var fileClient = fileSystemClient.GetFileClient(string.Join("", blobUri.Segments[2..]));
+                    await fileClient.DeleteIfExistsAsync(cancellationToken: ct);
+
+                    directoriesToDelete[string.Join("", blobUri.Segments[2..^1])] = 1;
+
+                    await environment.database.DeleteBlobToIngest(blob.Id, ct);
+                });
+
+            foreach (var dir in directoriesToDelete.Keys)
+            {
+                var dirClient = fileSystemClient.GetDirectoryClient(dir);
+
+                if (await dirClient.ExistsAsync(cancellationToken)
+                    && ! await (dirClient.GetPathsAsync(cancellationToken: cancellationToken)
+                        .AnyAsync(cancellationToken: cancellationToken)))
+                {
+                    log.LogInformation("Deleting empty folder {incrementalFolder}", dirClient.Uri);
+                    await dirClient.DeleteIfExistsAsync(cancellationToken: cancellationToken);
+                }
             }
         }
 
@@ -128,6 +176,29 @@ namespace DataverseToSql.Core.Jobs
             {
                 log.LogInformation("Detected schema changes.");
                 await DeploySqlSchemaAsync(cancellationToken);
+                await UpdateServerlessQueries(cancellationToken);
+            }
+        }
+
+        private async Task UpdateServerlessQueries(CancellationToken cancellationToken)
+        {
+            log.LogInformation("Updating serverless queries.");
+
+            foreach (var managedEntity in await environment.GetManagedEntitiesAsync(cancellationToken))
+            {
+                var (found, cdmEntity) = await environment.TryGetCdmEntityAsync(managedEntity, cancellationToken);
+                if (found && cdmEntity is not null)
+                {
+                    managedEntity.OpenrowsetQuery = cdmEntity.GetServerlessOpenrowsetQuery();
+
+                    var targetColumns = await environment.database.GetTableTypeColumnsAsync(
+                        tableName: managedEntity.Name,
+                        cancellationToken: cancellationToken);
+
+                    managedEntity.InnerQuery = cdmEntity.GetServerlessInnerQuery(targetColumns);
+
+                    await environment.database.UpsertAsync(managedEntity, cancellationToken);
+                }
             }
         }
 
@@ -219,6 +290,27 @@ namespace DataverseToSql.Core.Jobs
             }
         }
 
+        private string FormattedTimestamp()
+        {
+            return ingestionTimestamp.ToString("yyyyMMddHHmmss");
+        }
+
+        private Uri IncrementalBlobBasePath(ManagedEntity entity)
+        {
+            return new BlobUriBuilder(environment.Config.IncrementalStorage.ContainerUri())
+            {
+                BlobName = $"{entity.Name}"
+            }.ToUri();
+        }
+
+        private Uri IncrementalBlobUri(ManagedEntity entity, string name)
+        {
+            return new BlobUriBuilder(environment.Config.IncrementalStorage.ContainerUri())
+            {
+                BlobName = $"{entity.Name}/{FormattedTimestamp()}/{name}_{ingestionTimestamp:yyyyMMddHHmmss}.csv"
+            }.ToUri();
+        }
+
         // Perform the initial load of a newly added entity
         private async Task InitialLoad(ManagedEntity managedEntity, CdmModel.CdmEntity cdmEntity, CancellationToken cancellationToken)
         {
@@ -234,17 +326,6 @@ namespace DataverseToSql.Core.Jobs
                 return;
             }
 
-            var targetColumns = await environment.database.GetTableTypeColumnsAsync(
-                tableName: managedEntity.Name,
-                cancellationToken: cancellationToken);
-
-            if (targetColumns.Count == 0)
-            {
-                log.LogError("Could not retrieve column definition from database for entity {entity}.",
-                    managedEntity.Name);
-                return;
-            }
-
             // Process each entity's partition individually
             var partitionCount = 0;
             foreach (var partitionGroup in cdmEntity.PartitionGroups)
@@ -255,6 +336,8 @@ namespace DataverseToSql.Core.Jobs
                     partitionGroup.Name);
 
                 var targetPartitionUris = new List<Uri>();
+
+                var blobsToIngest = new List<BlobToIngest>();
 
                 foreach (var partition in partitionGroup.Partitions)
                 {
@@ -270,10 +353,7 @@ namespace DataverseToSql.Core.Jobs
                         BlobName = $"{managedEntity.Name}/{partition.Name}.csv"
                     }.ToUri();
 
-                    var targetPartitionUri = new BlobUriBuilder(environment.Config.IncrementalStorage.ContainerUri())
-                    {
-                        BlobName = $"{managedEntity.Name}/{partition.Name}_{ingestionTimestamp}.csv"
-                    }.ToUri();
+                    var targetPartitionUri = IncrementalBlobUri(managedEntity, partition.Name);
 
                     // Copy the current partition data to the incremental storage
                     await CopyBlob(sourcePartitionUri, targetPartitionUri, cancellationToken);
@@ -290,25 +370,20 @@ namespace DataverseToSql.Core.Jobs
                     await environment.database.UpsertAsync(managedBlob, cancellationToken);
 
                     targetPartitionUris.Add(targetPartitionUri);
+
+                    // Record the metadata of the blob for ingestion
+                    blobsToIngest.Add(new BlobToIngest(
+                        managedEntity,
+                        targetPartitionUri.ToString(),
+                        IncrementalBlobBasePath(managedEntity).ToString(),
+                        FormattedTimestamp(),
+                        partitionGroup.Name,
+                        LoadType.Full));
                 }
 
-                // Generate the query to run in Serverless SQL pool to read
-                // and deduplicate the partition
-                string serverlessQuery = cdmEntity.GetFullLoadServerlessQuery(
-                    targetPartitionUris,
-                    targetColumns
-                        .Where(c => !environment.Config.SchemaHandling.SkipIsDeleteColumn || c.ToLower() != "isdelete")
-                        .ToList());
-
-                // Record the metadata of the blob for ingestion
-                var blobToIngest = new BlobToIngest(
-                    managedEntity,
-                    partitionGroup.Name,
-                    environment.Config.Database.Schema,
-                    managedEntity.Name,
-                    serverlessQuery,
-                    LoadType.Full);
-                await environment.database.InsertAsync(blobToIngest, cancellationToken);
+                // Write blobs belonging to the same partition using
+                // a transaction
+                await environment.database.InsertAsync(blobsToIngest, cancellationToken);
             }
             if (partitionCount > 0)
             {
@@ -358,7 +433,7 @@ namespace DataverseToSql.Core.Jobs
         }
 
         // Perform the incremental load of an existing entity
-        private async Task IncrementalLoad(ManagedEntity managedEntity, CdmModel.CdmEntity cdmEntity, CancellationToken cancellationToken)
+        private async Task IncrementalLoad(ManagedEntity managedEntity, CancellationToken cancellationToken)
         {
             // Generate the Authorization header for the storage copy API.
             var sourceAuthentication = new HttpAuthorization(
@@ -374,106 +449,70 @@ namespace DataverseToSql.Core.Jobs
 
             log.LogInformation("Entity {entity}: performing incremental load.", managedEntity.Name);
 
-            var targetColumns = await environment.database.GetTableTypeColumnsAsync(
-                tableName: managedEntity.Name,
-                cancellationToken: cancellationToken);
-
-            if (targetColumns.Count == 0)
-            {
-                log.LogError("Could not retrieve column definition from database for entity {entity}.",
-                    managedEntity.Name);
-                return;
-            }
-
             var newData = false;
 
-            // Group managed blobs belonging to the same entity together to process them
-            // using a single serverless query.
-            // The goal is reducing the number of pipeline activities used to process a
-            // single entity.
-            foreach (var managedBlobGroup in managedBlobs.GroupBy(mb => mb.Entity.Name))
+            // Process each blob separately
+            foreach (var managedBlob in managedBlobs)
             {
-                var managedBlobGroupName = $"{managedBlobGroup.Key}_{ingestionTimestamp}";
-                var targetBlobUris = new List<Uri>();
-
-                // Process each blob separately
-                foreach (var managedBlob in managedBlobGroup.OrderBy(mb => mb.Name))
+                var sourceBlobUri = new BlobUriBuilder(environment.Config.DataverseStorage.ContainerUri())
                 {
-                    var sourceBlobUri = new BlobUriBuilder(environment.Config.DataverseStorage.ContainerUri())
-                    {
-                        BlobName = $"{managedEntity.Name}/{managedBlob.Name}"
-                    }.ToUri();
+                    BlobName = $"{managedEntity.Name}/{managedBlob.Name}"
+                }.ToUri();
 
-                    var blockClient = new BlockBlobClient(
-                        sourceBlobUri,
-                        environment.Credential
-                        );
+                var blockClient = new BlockBlobClient(
+                    sourceBlobUri,
+                    environment.Credential
+                    );
 
-                    var currentBlobSize = (await blockClient.GetPropertiesAsync(cancellationToken: cancellationToken)).Value.ContentLength;
+                var currentBlobSize = (await blockClient.GetPropertiesAsync(cancellationToken: cancellationToken)).Value.ContentLength;
 
-                    // Check if there are new data in the blob by comparing the current size with the previously
-                    // stored size (offset). Since the partition is append-only, a bigger blob means new data.
-                    // If there are new data, copy them to a separate blob that will later be ingested by the
-                    // dedicated Synapse pipeline.
-                    if (currentBlobSize > managedBlob.Offset)
-                    {
-                        newData = true;
-
-                        var newBlockSize = currentBlobSize - managedBlob.Offset;
-
-                        var targetBlobName = string.Format(
-                            "{0}_{1}.csv",
-                            Path.GetFileNameWithoutExtension(managedBlob.Name),
-                            ingestionTimestamp);
-
-                        var targetBlobUri = new BlobUriBuilder(environment.Config.IncrementalStorage.ContainerUri())
-                        {
-                            BlobName = $"{managedEntity.Name}/{targetBlobName}"
-                        }.ToUri();
-
-                        log.LogInformation("Entity {entity}: copying {bytes} bytes from {sourceUri} to {targetUri}.",
-                            managedEntity.Name,
-                            newBlockSize,
-                            sourceBlobUri.ToString(),
-                            targetBlobUri.ToString());
-
-                        var targetBlockClient = new BlockBlobClient(
-                            targetBlobUri,
-                            environment.Credential);
-
-                        // Copy the new block of data at the end of the blob
-                        // to the target blob.
-                        await targetBlockClient.CopyRangeFromUriAsync(
-                            sourceBlobUri,
-                            sourceAuthentication,
-                            managedBlob.Offset,
-                            newBlockSize,
-                            cancellationToken: cancellationToken);
-
-                        managedBlob.Offset = currentBlobSize;
-                        await environment.database.UpsertAsync(managedBlob, cancellationToken);
-
-                        targetBlobUris.Add(targetBlobUri);
-                    }
-                }
-
-                if (targetBlobUris.Count > 0)
+                // Check if there are new data in the blob by comparing the current size with the previously
+                // stored size (offset). Since the partition is append-only, a bigger blob means new data.
+                // If there are new data, copy them to a separate blob that will later be ingested by the
+                // dedicated Synapse pipeline.
+                if (currentBlobSize > managedBlob.Offset)
                 {
-                    // Generate the query to run in Serverless SQL pool to read
-                    // and deduplicate the new data
-                    var serverlessQuery = cdmEntity.GetIncrementalLoadServerlessQuery(
-                        targetBlobUris,
-                        targetColumns);
+                    newData = true;
 
-                    // Record the metadata of the blob for ingestion
-                    await environment.database.InsertAsync(new BlobToIngest(
+                    var newBlockSize = currentBlobSize - managedBlob.Offset;
+
+                    var targetBlobUri = IncrementalBlobUri(
                         managedEntity,
-                        managedBlobGroupName,
-                        environment.Config.Database.Schema,
+                        Path.GetFileNameWithoutExtension(managedBlob.Name));
+
+                    log.LogInformation("Entity {entity}: copying {bytes} bytes from {sourceUri} to {targetUri}.",
                         managedEntity.Name,
-                        serverlessQuery,
-                        LoadType.Incremental
-                        ),
+                        newBlockSize,
+                        sourceBlobUri.ToString(),
+                        targetBlobUri.ToString());
+
+                    var targetBlockClient = new BlockBlobClient(
+                        targetBlobUri,
+                        environment.Credential);
+
+                    // Copy the new block of data from the end of the source blob
+                    // to the target blob.
+                    await targetBlockClient.CopyRangeFromUriAsync(
+                        sourceBlobUri,
+                        sourceAuthentication,
+                        managedBlob.Offset,
+                        newBlockSize,
+                        cancellationToken: cancellationToken);
+
+                    managedBlob.Offset = currentBlobSize;
+                    await environment.database.UpsertAsync(managedBlob, cancellationToken);
+
+                    // Record the metadata of the new blob for ingestion
+                    await environment.database.InsertAsync(
+                        new List<BlobToIngest> {
+                            new BlobToIngest(
+                                managedEntity,
+                                targetBlobUri.ToString(),
+                                IncrementalBlobBasePath(managedEntity).ToString(),
+                                FormattedTimestamp(),
+                                "",
+                                LoadType.Incremental
+                                ) },
                         cancellationToken);
                 }
             }

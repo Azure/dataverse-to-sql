@@ -18,6 +18,10 @@
     "add-non-existing-entity": {
       "commandName": "Project",
       "commandLineArgs": "add --name non-existing-entity -p ./test"
+    },
+    "add account": {
+      "commandName": "Project",
+      "commandLineArgs": "add --name account -p ./test"
     }
   }
 }

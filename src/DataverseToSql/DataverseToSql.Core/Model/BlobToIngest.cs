@@ -12,30 +12,30 @@ namespace DataverseToSql.Core.Model
         internal BlobToIngest(
             ManagedEntity entity,
             string name,
-            string targetSchema,
-            string targetTable,
-            string serverlessQuery,
+            string basePath,
+            string timestamp,
+            string partition,
             LoadType loadType
             )
         {
             Entity = entity;
             Name = name;
-            TargetSchema = targetSchema;
-            TargetTable = targetTable;
-            ServerlessQuery = serverlessQuery;
+            BasePath = basePath;
+            Timestamp = timestamp;
+            Partition = partition;
             LoadType = loadType;
         }
 
         // Reference to the managed entity the blob belongs to
         public ManagedEntity Entity { get; }
-        // Name of the blob, as a relative path in the container
+        // Name of the blob, as a full path in the container
         public string Name { get; }
-        // Schema of the table the data are loaded to
-        public string TargetSchema { get; }
-        // Name of the table the data are loaded to
-        public string TargetTable { get; }
-        // Query to be executed in Serverless SQL Pool to read and deduplicate the source data
-        public string ServerlessQuery { get; }
+        // Base path of the blob up to the entity level
+        public string BasePath { get; }
+        // Timestamp of the blob
+        public string Timestamp { get; }
+        // Name of the partition the blob belongs to
+        public string Partition { get; }
         // Type of load operation, either full or incremenetal
         public LoadType LoadType { get; }
     }

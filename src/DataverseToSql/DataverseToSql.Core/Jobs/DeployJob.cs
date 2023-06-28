@@ -339,72 +339,36 @@ namespace DataverseToSql.Core.Jobs
                     "@variables('OptionsetTables')"),
                 new List<Activity>() { loadOptionsetActivity })
             {
-                BatchCount = environment.Config.Ingestion.Parallelism
+                BatchCount = 6
             };
 
             pipeline.Activities.Add(foreachOptionsetTableActivity);
 
-            // Activity: Lookup blobs to ingest
-            // Lookup activity that retrieves the list of all blobs to be ingested
-            var lookupBlobsToIngestSource = new AzureSqlSource()
+            // Activity: Lookup ingestion jobs
+            // Lookup activity that retrieves the list of ingestion jobs to run
+            var lookupIngestionJobsSource = new AzureSqlSource()
             {
-                SqlReaderStoredProcedureName = "[DataverseToSql].[BlobsToIngest_Get]"
+                SqlReaderStoredProcedureName = "[DataverseToSql].[IngestionJobs_Get]"
             };
 
-            var lookupBlobsToIngestDataset = new DatasetReference(
+            var lookupIngestionJobsDataset = new DatasetReference(
                 DatasetReferenceType.DatasetReference,
                 Naming.MetadataDatasetName());
 
-            var lookupBlobsToIngestActivity = new LookupActivity(
-                "Lookup blobs to ingest",
-                lookupBlobsToIngestSource,
-                lookupBlobsToIngestDataset)
+            var lookupIngestionJobsActivity = new LookupActivity(
+                "Lookup ingestion jobs",
+                lookupIngestionJobsSource,
+                lookupIngestionJobsDataset)
             {
                 FirstRowOnly = false
             };
 
-            lookupBlobsToIngestActivity.DependsOn.Add(
+            lookupIngestionJobsActivity.DependsOn.Add(
                 new ActivityDependency(
                     foreachOptionsetTableActivity.Name,
                     new List<DependencyCondition>() { new("Succeeded") }));
 
-            pipeline.Activities.Add(lookupBlobsToIngestActivity);
-
-            // Activity: Lookup Blob Details
-            // Lookup activity that retrieves details about a blob to ingest
-            var lookupBlobsToIngestDetailsSource = new AzureSqlSource()
-            {
-                SqlReaderStoredProcedureName = "[DataverseToSql].[BlobsToIngest_GetDetails]",
-            };
-
-            lookupBlobsToIngestDetailsSource.StoredProcedureParameters["EntityName"] = new StoredProcedureParameter()
-            {
-                Type = StoredProcedureParameterType.String,
-                Value = new Expression(
-                    ExpressionType.Expression,
-                    "@item().EntityName")
-            };
-
-            lookupBlobsToIngestDetailsSource.StoredProcedureParameters["BlobName"] = new StoredProcedureParameter()
-            {
-                Type = StoredProcedureParameterType.String,
-                Value = new Expression(
-                    ExpressionType.Expression,
-                    "@item().BlobName")
-            };
-
-            var lookupBlobsToIngestDetailsDataset = new DatasetReference(
-                DatasetReferenceType.DatasetReference,
-                Naming.MetadataDatasetName());
-
-            var lookupBlobsToIngestDetailsActivity = new LookupActivity(
-                "Lookup Blob Details",
-                lookupBlobsToIngestDetailsSource,
-                lookupBlobsToIngestDetailsDataset)
-            {
-                FirstRowOnly = true
-            };
-
+            pipeline.Activities.Add(lookupIngestionJobsActivity);
 
             // Activity: Full Load
             // Copy activity that performs the full load of a blob to Azure SQL Database.
@@ -415,7 +379,7 @@ namespace DataverseToSql.Core.Jobs
             {
                 SqlReaderQuery = new Expression(
                     ExpressionType.Expression,
-                    "@activity('Lookup Blob Details').output.firstRow.ServerlessQuery")
+                    "@item().ServerlessQuery")
             };
 
             // The sink is configured for insert and to use table lock.
@@ -441,10 +405,10 @@ namespace DataverseToSql.Core.Jobs
             // retrieved by the lookup activity
             fullLoadOutputReference.Parameters["Schema"] = new Expression(
                 ExpressionType.Expression,
-                "@activity('Lookup Blob Details').output.firstRow.TargetSchema");
+                "@item().TargetSchema");
             fullLoadOutputReference.Parameters["Table"] = new Expression(
                 ExpressionType.Expression,
-                "@activity('Lookup Blob Details').output.firstRow.TargetTable");
+                "@item().TargetTable");
 
             fullLoadActivity.Outputs.Add(fullLoadOutputReference);
 
@@ -457,7 +421,7 @@ namespace DataverseToSql.Core.Jobs
             {
                 SqlReaderQuery = new Expression(
                     ExpressionType.Expression,
-                    "@activity('Lookup Blob Details').output.firstRow.ServerlessQuery")
+                    "@item().ServerlessQuery")
             };
 
             // The sink is configured for upsert using a stored procedure.
@@ -493,10 +457,10 @@ namespace DataverseToSql.Core.Jobs
             // retrieved by the lookup activity
             incrementalOutputReference.Parameters["Schema"] = new Expression(
                 ExpressionType.Expression,
-                "@activity('Lookup Blob Details').output.firstRow.TargetSchema");
+                "@item().TargetSchema");
             incrementalOutputReference.Parameters["Table"] = new Expression(
                 ExpressionType.Expression,
-                "@activity('Lookup Blob Details').output.firstRow.TargetTable");
+                "@item().TargetTable");
 
             incrementalLoadActivity.Outputs.Add(incrementalOutputReference);
 
@@ -509,7 +473,7 @@ namespace DataverseToSql.Core.Jobs
 
             var switchLoadTypeActivity = new SwitchActivity(
                 "Switch load type",
-                new Expression(ExpressionType.Expression, "@string(activity('Lookup Blob Details').output.firstRow.LoadType)"));
+                new Expression(ExpressionType.Expression, "@string(item().LoadType)"));
 
             var fullLoadCase = new SwitchCase() { Value = "0", }; // full load
             fullLoadCase.Activities.Add(fullLoadActivity);
@@ -519,39 +483,25 @@ namespace DataverseToSql.Core.Jobs
             incrementalLoadCase.Activities.Add(incrementalLoadActivity);
             switchLoadTypeActivity.Cases.Add(incrementalLoadCase);
 
-            switchLoadTypeActivity.DependsOn.Add(
-                new ActivityDependency(
-                    lookupBlobsToIngestDetailsActivity.Name,
-                    new List<DependencyCondition>() { new("Succeeded") }));
-
-            // Activity: Mark blob complete
-            // The activity marks a blob as complete after it has been loaded (either
-            // with a full or incremental copy).
-            // The logic is implemented in the [DataverseToSql].[BlobsToIngest_Complete]
+            // Activity: Mark job complete
+            // The activity marks an ingestion job as complete
+            // The logic is implemented in the [DataverseToSql].[IngestionJobs_Complete]
             // stored procedure.
 
             var markBlobCompleteActivity = new SqlServerStoredProcedureActivity(
-                "Mark blob complete",
-                "[DataverseToSql].[BlobsToIngest_Complete]")
+                "Mark job complete",
+                "[DataverseToSql].[IngestionJobs_Complete]")
             {
                 StoredProcedureParameters = new Dictionary<string, object>
                 {
-                    ["EntityName"] = new StoredProcedureParameter()
+                    ["JobId"] = new StoredProcedureParameter()
                     {
-                        Type = StoredProcedureParameterType.String,
+                        Type = StoredProcedureParameterType.Int64,
                         Value = new Expression(
                         ExpressionType.Expression,
-                        "@item().EntityName"
+                        "@item().JobId"
                         )
-                    },
-                    ["BlobName"] = new StoredProcedureParameter()
-                    {
-                        Type = StoredProcedureParameterType.String,
-                        Value = new Expression(
-                        ExpressionType.Expression,
-                        "@item().BlobName"
-                        )
-                    },
+                    }
                 },
                 LinkedServiceName = new(LinkedServiceReferenceType.LinkedServiceReference,
                     Naming.AzureSqlLinkedServiceName())
@@ -567,11 +517,10 @@ namespace DataverseToSql.Core.Jobs
             // and invokes the switch activity that in turns invokes the copy
 
             var foreachBlobActivity = new ForEachActivity(
-                "For each blob to ingest",
-                new Expression(ExpressionType.Expression, "@activity('Lookup blobs to ingest').output.value"),
+                "For each ingestion job",
+                new Expression(ExpressionType.Expression, "@activity('Lookup ingestion jobs').output.value"),
                 new List<Activity>()
                 {
-                    lookupBlobsToIngestDetailsActivity,
                     switchLoadTypeActivity,
                     markBlobCompleteActivity
                 })
@@ -581,33 +530,10 @@ namespace DataverseToSql.Core.Jobs
 
             foreachBlobActivity.DependsOn.Add(
                 new ActivityDependency(
-                    lookupBlobsToIngestActivity.Name,
+                    lookupIngestionJobsActivity.Name,
                     new List<DependencyCondition>() { new("Succeeded") }));
 
             pipeline.Activities.Add(foreachBlobActivity);
-
-            // Activity: Mark full load complete
-            // It invokes the [DataverseToSql].[BlobsToIngest_Complete] stored
-            // procedure to change the state of the entities that were ingested.
-            // The main goal is to change the state from PendingInitialIngestion (1)
-            // to Ready (2) for the newly added entities, after the initial load of 
-            // all their partitions is complete.
-            // The activity runs whether the previous activity fails or now
-
-            var markFullLoadCompleteActivity = new SqlServerStoredProcedureActivity(
-                "Mark full load complete",
-                "[DataverseToSql].[FullLoad_Complete]")
-            {
-                LinkedServiceName = new(LinkedServiceReferenceType.LinkedServiceReference,
-                    Naming.AzureSqlLinkedServiceName())
-            };
-
-            markFullLoadCompleteActivity.DependsOn.Add(
-                new ActivityDependency(
-                    foreachBlobActivity.Name,
-                    new List<DependencyCondition>() { new("Completed") }));
-
-            pipeline.Activities.Add(markFullLoadCompleteActivity);
 
             // Activity: Fail pipeline
             // The activity runs when either of the foreach activities (optionsets

@@ -41,7 +41,9 @@ namespace DataverseToSql.Core.Jobs
 
             await environment.database.UpsertAsync(new ManagedEntity
             {
-                Name = cdmEntity.Name
+                Name = cdmEntity.Name,
+                TargetSchema = environment.Config.Database.Schema,
+                TargetTable = cdmEntity.Name
             },
             cancellationToken);
         }
