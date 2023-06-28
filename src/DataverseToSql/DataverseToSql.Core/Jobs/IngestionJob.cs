@@ -8,9 +8,7 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 using BlockBlobClientCopyRangeExtension;
 using DataverseToSql.Core.Model;
-using Microsoft.Azure.Management.Synapse.Models;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 
 namespace DataverseToSql.Core.Jobs
 {
@@ -262,11 +260,24 @@ namespace DataverseToSql.Core.Jobs
             }
         }
 
+        private string FormattedTimestamp()
+        {
+            return ingestionTimestamp.ToString("yyyyMMddHHmmss");
+        }
+
+        private Uri IncrementalBlobBasePath(ManagedEntity entity)
+        {
+            return new BlobUriBuilder(environment.Config.IncrementalStorage.ContainerUri())
+            {
+                BlobName = $"{entity.Name}"
+            }.ToUri();
+        }
+
         private Uri IncrementalBlobUri(ManagedEntity entity, string name)
         {
             return new BlobUriBuilder(environment.Config.IncrementalStorage.ContainerUri())
             {
-                BlobName = $"{entity.Name}/{name}_{ingestionTimestamp.ToString("yyyyMMddHHmmss")}.csv"
+                BlobName = $"{entity.Name}/{FormattedTimestamp()}/{name}_{ingestionTimestamp.ToString("yyyyMMddHHmmss")}.csv"
             }.ToUri();
         }
 
@@ -334,6 +345,8 @@ namespace DataverseToSql.Core.Jobs
                     blobsToIngest.Add(new BlobToIngest(
                         managedEntity,
                         targetPartitionUri.ToString(),
+                        IncrementalBlobBasePath(managedEntity).ToString(),
+                        FormattedTimestamp(),
                         partitionGroup.Name,
                         LoadType.Full));
                 }
@@ -465,6 +478,8 @@ namespace DataverseToSql.Core.Jobs
                             new BlobToIngest(
                                 managedEntity,
                                 targetBlobUri.ToString(),
+                                IncrementalBlobBasePath(managedEntity).ToString(),
+                                FormattedTimestamp(),
                                 "",
                                 LoadType.Incremental
                                 ) },

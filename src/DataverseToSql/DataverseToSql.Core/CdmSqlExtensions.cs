@@ -132,10 +132,12 @@ namespace DataverseToSql.Core
             var sourceColumns = string.Join(",", entity.Attributes.Select(attr => attr.SqlColumnDef(serverless: true)));
 
             return $@"
-                    SELECT  *
-                    FROM    OPENROWSET(BULK ( N'<<<BLOB_PLACEHOLDER>>>' ),
-                            FORMAT = 'csv', FIELDTERMINATOR  = ',', FIELDQUOTE = '""')
-                            WITH ({sourceColumns}) AS T<<<ORDINAL_PLACEHOLDER>>>";
+                SELECT  *
+                FROM    OPENROWSET(BULK ( N'<<<BLOB_PLACEHOLDER>>>' ),
+                        FORMAT = 'csv', FIELDTERMINATOR  = ',', FIELDQUOTE = '""')
+                        WITH ({sourceColumns}) AS T1
+                WHERE   T1.filepath(1) >= '<<<TIMESTAMP_FROM_PLACEHOLDER>>>'
+                        AND T1.filepath(1) <= '<<<TIMESTAMP_TO_PLACEHOLDER>>>'";
         }
 
         public static string GetServerlessInnerQuery(

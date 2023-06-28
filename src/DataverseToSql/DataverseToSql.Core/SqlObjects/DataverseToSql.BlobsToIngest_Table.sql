@@ -5,6 +5,8 @@ CREATE TABLE [DataverseToSql].[BlobsToIngest] (
 	[Id] BIGINT IDENTITY PRIMARY KEY,
 	[EntityName] [DataverseToSql].[EntityType] NOT NULL,
 	[BlobName] [DataverseToSql].[BlobNameType] NOT NULL,
+	[BasePath] [DataverseToSql].[BlobNameType] NOT NULL,
+	[Timestamp] [DataverseToSql].[TimestampType] NOT NULL,
 	[Partition] [DataverseToSql].[BlobPartitionType] NOT NULL,
 	[LoadType] INT NOT NULL, -- Full=0, Incremental=1 (from LoadType enum)
 	[Complete] INT NOT NULL DEFAULT 0,

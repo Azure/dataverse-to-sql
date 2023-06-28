@@ -486,6 +486,8 @@ namespace DataverseToSql.Core
             cmd.CommandText = "[DataverseToSql].[BlobsToIngest_Insert]";
             cmd.Parameters.Add(new() { ParameterName = "@EntityName" });
             cmd.Parameters.Add(new() { ParameterName = "@BlobName" });
+            cmd.Parameters.Add(new() { ParameterName = "@BasePath" });
+            cmd.Parameters.Add(new() { ParameterName = "@Timestamp" });
             cmd.Parameters.Add(new() { ParameterName = "@Partition" });
             cmd.Parameters.Add(new() { ParameterName = "@LoadType" });
 
@@ -501,6 +503,8 @@ namespace DataverseToSql.Core
                 {
                     cmd.Parameters["@EntityName"].Value = blob.Entity.Name;
                     cmd.Parameters["@BlobName"].Value = blob.Name;
+                    cmd.Parameters["@BasePath"].Value = blob.BasePath;
+                    cmd.Parameters["@Timestamp"].Value = blob.Timestamp;
                     cmd.Parameters["@Partition"].Value = blob.Partition;
                     cmd.Parameters["@LoadType"].Value = (int)blob.LoadType;
                     await cmd.ExecuteNonQueryAsync(cancellationToken);

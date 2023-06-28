@@ -4,6 +4,8 @@
 CREATE PROCEDURE [DataverseToSql].[BlobsToIngest_Insert]
 	@EntityName [DataverseToSql].[EntityType],
 	@BlobName [DataverseToSql].[BlobNameType],
+	@BasePath [DataverseToSql].[BlobNameType],
+	@Timestamp [DataverseToSql].[TimestampType],
 	@Partition [DataverseToSql].[BlobPartitionType],
 	@LoadType INT
 AS
@@ -17,12 +19,16 @@ BEGIN
 	INSERT INTO [DataverseToSql].[BlobsToIngest](
 		[EntityName],
 		[BlobName],
+		[BasePath],
+		[Timestamp],
 		[Partition],
 		[LoadType]
 	)
 	VALUES (
 		@EntityName,
 		@BlobName,
+		@BasePath,
+		@Timestamp,
 		@Partition,
 		@LoadType
 	)
