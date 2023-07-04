@@ -44,7 +44,12 @@ SELECT
 				-- Incremental load
 				WHEN 1 THEN '*.csv'
 			END),
-		e.[InnerQuery],
+		CASE j.[LoadType]
+			-- Full load
+			WHEN 0 THEN e.[FullLoadInnerQuery]
+			-- Incremental load
+			WHEN 1 THEN e.[IncrementalInnerQuery]
+		END,
 		j.[LoadType]
 	) AS [ServerlessQuery],
 	j.[LoadType]

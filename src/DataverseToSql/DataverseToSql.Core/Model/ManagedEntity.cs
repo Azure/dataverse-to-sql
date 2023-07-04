@@ -19,8 +19,10 @@ namespace DataverseToSql.Core.Model
         public string TargetSchema { get; set; } = "";
         // Name of the the table in the target SQL database
         public string TargetTable { get; set; } = "";
-        // Serverless query for deduplication
-        public string? InnerQuery { get; set; } = null;
+        // Serverless query for deduplication of full loads
+        public string? FullLoadInnerQuery { get; set; } = null;
+        // Serverless query for deduplication of incremental loads
+        public string? IncrementalInnerQuery { get; set; } = null;
         // Serverless OPENROWSET query
         public string? OpenrowsetQuery { get; set; } = null;
     }

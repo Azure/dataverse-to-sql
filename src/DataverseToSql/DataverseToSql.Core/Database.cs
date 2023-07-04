@@ -301,7 +301,8 @@ namespace DataverseToSql.Core
             cmd.Parameters.Add(new() { ParameterName = "@TargetTable" });
             cmd.Parameters.Add(new() { ParameterName = "@State" });
             cmd.Parameters.Add(new() { ParameterName = "@SchemaHash" });
-            cmd.Parameters.Add(new() { ParameterName = "@InnerQuery" });
+            cmd.Parameters.Add(new() { ParameterName = "@FullLoadInnerQuery" });
+            cmd.Parameters.Add(new() { ParameterName = "@IncrementalInnerQuery" });
             cmd.Parameters.Add(new() { ParameterName = "@OpenrowsetQuery" });
 
             cmd.Parameters["@EntityName"].Value = managedEntity.Name;
@@ -309,7 +310,8 @@ namespace DataverseToSql.Core
             cmd.Parameters["@TargetTable"].Value = managedEntity.TargetTable;
             cmd.Parameters["@State"].Value = managedEntity.State;
             cmd.Parameters["@SchemaHash"].Value = managedEntity.SchemaHash;
-            cmd.Parameters["@InnerQuery"].Value = managedEntity.InnerQuery;
+            cmd.Parameters["@FullLoadInnerQuery"].Value = managedEntity.FullLoadInnerQuery;
+            cmd.Parameters["@IncrementalInnerQuery"].Value = managedEntity.IncrementalInnerQuery;
             cmd.Parameters["@OpenrowsetQuery"].Value = managedEntity.OpenrowsetQuery;
 
             await cmd.ExecuteNonQueryAsync(cancellationToken);
