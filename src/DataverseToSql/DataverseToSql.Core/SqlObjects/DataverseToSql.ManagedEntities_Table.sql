@@ -7,6 +7,7 @@ CREATE TABLE [DataverseToSql].[ManagedEntities] (
 	[SchemaHash] NVARCHAR(128) NULL,
 	[TargetSchema] SYSNAME NOT NULL,
 	[TargetTable] SYSNAME NOT NULL,
-	[InnerQuery] NVARCHAR(MAX) NULL,
+	[FullLoadInnerQuery] NVARCHAR(MAX) NULL,
+	[IncrementalInnerQuery] NVARCHAR(MAX) NULL,
 	[OpenrowsetQuery] NVARCHAR(MAX) NULL
 )

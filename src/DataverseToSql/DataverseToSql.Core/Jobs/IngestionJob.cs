@@ -195,7 +195,9 @@ namespace DataverseToSql.Core.Jobs
                         tableName: managedEntity.Name,
                         cancellationToken: cancellationToken);
 
-                    managedEntity.InnerQuery = cdmEntity.GetServerlessInnerQuery(targetColumns);
+                    managedEntity.FullLoadInnerQuery = cdmEntity.GetServerlessInnerQuery(targetColumns
+                        .Where(column => !environment.Config.SchemaHandling.SkipIsDeleteColumn || column.ToLower() != "isdelete").ToList());
+                    managedEntity.IncrementalInnerQuery = cdmEntity.GetServerlessInnerQuery(targetColumns);
 
                     await environment.database.UpsertAsync(managedEntity, cancellationToken);
                 }
