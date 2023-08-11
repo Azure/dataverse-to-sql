@@ -65,7 +65,6 @@ namespace DataverseToSql.Core
 
                     _model.AddObjects(SqlObjects.DataverseToSql_IngestionJobs_Get_Proc);
                     _model.AddObjects(SqlObjects.DataverseToSql_IngestionJobs_Complete_Proc);
-                    _model.AddObjects(SqlObjects.DataverseToSql_ServerlessQuery_Func);
 
                     _model.AddObjects(SqlObjects.DataverseToSql_ManagedCustomScripts_Table);
                     _model.AddObjects(SqlObjects.DataverseToSql_ManagedCustomScripts_Upsert_Proc);
@@ -303,7 +302,6 @@ namespace DataverseToSql.Core
             cmd.Parameters.Add(new() { ParameterName = "@SchemaHash" });
             cmd.Parameters.Add(new() { ParameterName = "@FullLoadInnerQuery" });
             cmd.Parameters.Add(new() { ParameterName = "@IncrementalInnerQuery" });
-            cmd.Parameters.Add(new() { ParameterName = "@OpenrowsetQuery" });
 
             cmd.Parameters["@EntityName"].Value = managedEntity.Name;
             cmd.Parameters["@TargetSchema"].Value = managedEntity.TargetSchema;
@@ -312,7 +310,6 @@ namespace DataverseToSql.Core
             cmd.Parameters["@SchemaHash"].Value = managedEntity.SchemaHash;
             cmd.Parameters["@FullLoadInnerQuery"].Value = managedEntity.FullLoadInnerQuery;
             cmd.Parameters["@IncrementalInnerQuery"].Value = managedEntity.IncrementalInnerQuery;
-            cmd.Parameters["@OpenrowsetQuery"].Value = managedEntity.OpenrowsetQuery;
 
             await cmd.ExecuteNonQueryAsync(cancellationToken);
             conn.Close();

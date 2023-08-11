@@ -24,7 +24,6 @@ namespace DataverseToSql.Core.Model
         // Serverless query for deduplication of incremental loads
         public string? IncrementalInnerQuery { get; set; } = null;
         // Serverless OPENROWSET query
-        public string? OpenrowsetQuery { get; set; } = null;
     }
 
     public enum ManagedEntityState

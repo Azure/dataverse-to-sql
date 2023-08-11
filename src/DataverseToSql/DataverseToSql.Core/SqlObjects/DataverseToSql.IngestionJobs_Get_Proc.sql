@@ -29,10 +29,14 @@ SELECT
 	e.[EntityName],
 	e.[TargetSchema],
 	e.[TargetTable],
-	[DataverseToSql].[ServerlessQuery](
 		-- OPENROWSET query
 		REPLACE(REPLACE(REPLACE(
-			e.[OpenrowsetQuery],
+			CASE j.[LoadType]
+				-- Full load
+				WHEN 0 THEN e.[FullLoadInnerQuery]
+				-- Incremental load
+				WHEN 1 THEN e.[IncrementalInnerQuery]
+			END,
 			'<<<TIMESTAMP_FROM_PLACEHOLDER>>>',
 			j.[TimestampFrom]),
 			'<<<TIMESTAMP_TO_PLACEHOLDER>>>',
@@ -43,15 +47,8 @@ SELECT
 				WHEN 0 THEN j.[Partition] + '*.csv'
 				-- Incremental load
 				WHEN 1 THEN '*.csv'
-			END),
-		CASE j.[LoadType]
-			-- Full load
-			WHEN 0 THEN e.[FullLoadInnerQuery]
-			-- Incremental load
-			WHEN 1 THEN e.[IncrementalInnerQuery]
-		END,
-		j.[LoadType]
-	) AS [ServerlessQuery],
+			END)
+	AS [ServerlessQuery],
 	j.[LoadType]
 FROM
 	jobs j
