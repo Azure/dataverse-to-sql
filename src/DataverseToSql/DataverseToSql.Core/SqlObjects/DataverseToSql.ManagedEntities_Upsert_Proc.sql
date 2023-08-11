@@ -8,8 +8,7 @@ CREATE PROCEDURE [DataverseToSql].[ManagedEntities_Upsert]
 	@State INT = NULL,
 	@SchemaHash NVARCHAR(128) = NULL,
 	@FullLoadInnerQuery NVARCHAR(MAX) = NULL,
-	@IncrementalInnerQuery NVARCHAR(MAX) = NULL,
-	@OpenrowsetQuery NVARCHAR(MAX) = NULL
+	@IncrementalInnerQuery NVARCHAR(MAX) = NULL
 AS
 IF NOT EXISTS (
 	SELECT * FROM [DataverseToSql].[ManagedEntities]
@@ -23,8 +22,7 @@ BEGIN
 		[TargetSchema],
 		[TargetTable],
 		[FullLoadInnerQuery],
-		[IncrementalInnerQuery],
-		[OpenrowsetQuery]
+		[IncrementalInnerQuery]
 	)
 	VALUES (
 		@EntityName,
@@ -33,8 +31,7 @@ BEGIN
 		@TargetSchema,
 		@TargetTable,
 		@FullLoadInnerQuery,
-		@IncrementalInnerQuery,
-		@OpenrowsetQuery
+		@IncrementalInnerQuery
 	)
 END
 ELSE
@@ -44,8 +41,7 @@ BEGIN
 		[State] = ISNULL(@State, [State]),
 		[SchemaHash] = ISNULL(@SchemaHash, [SchemaHash]),
 		[FullLoadInnerQuery] = ISNULL(@FullLoadInnerQuery, [FullLoadInnerQuery]),
-		[IncrementalInnerQuery] = ISNULL(@IncrementalInnerQuery, [IncrementalInnerQuery]),
-		[OpenrowsetQuery] = ISNULL(@OpenrowsetQuery, [OpenrowsetQuery])
+		[IncrementalInnerQuery] = ISNULL(@IncrementalInnerQuery, [IncrementalInnerQuery])
 	WHERE
 		[EntityName] = @EntityName
 END

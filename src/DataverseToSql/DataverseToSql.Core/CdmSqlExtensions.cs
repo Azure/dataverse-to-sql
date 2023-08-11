@@ -126,20 +126,6 @@ namespace DataverseToSql.Core
             return sb.ToString();
         }
 
-        public static string GetServerlessOpenrowsetQuery(
-            this CdmEntity entity)
-        {
-            var sourceColumns = string.Join(",", entity.Attributes.Select(attr => attr.SqlColumnDef(serverless: true)));
-
-            return $@"
-                SELECT  *
-                FROM    OPENROWSET(BULK ( N'<<<BLOB_PLACEHOLDER>>>' ),
-                        FORMAT = 'csv', FIELDTERMINATOR  = ',', FIELDQUOTE = '""')
-                        WITH ({sourceColumns}) AS T1
-                WHERE   T1.filepath(1) >= '<<<TIMESTAMP_FROM_PLACEHOLDER>>>'
-                        AND T1.filepath(1) <= '<<<TIMESTAMP_TO_PLACEHOLDER>>>'";
-        }
-
         public static string GetServerlessInnerQuery(
             this CdmEntity entity,
             IList<string> targetColumns)
@@ -152,32 +138,24 @@ namespace DataverseToSql.Core
 
             var innerQuery = $@"                
                 WITH cte_openrowset AS (
-                    <<<OPENROWSET_PLACEHOLDER>>>
-                ),
-                cte_source AS (
-                    SELECT TOP <<<TOP_PLACEHOLDER>>> *
-                    FROM cte_openrowset
+                    SELECT  *
+                    FROM    OPENROWSET(BULK ( N'<<<BLOB_PLACEHOLDER>>>' ),
+                            FORMAT = 'csv', FIELDTERMINATOR  = ',', FIELDQUOTE = '""')
+                            WITH ({sourceColumns}) AS T1
+                    WHERE   T1.filepath(1) >= '<<<TIMESTAMP_FROM_PLACEHOLDER>>>'
+                            AND T1.filepath(1) <= '<<<TIMESTAMP_TO_PLACEHOLDER>>>'
                 ),
                 cte_rownumber AS (
                     SELECT  ROW_NUMBER() OVER (PARTITION BY {primaryKeyString} ORDER BY [SinkModifiedOn] DESC, [versionnumber] DESC) [DvRowNumber],
-                            {primaryKeyString},
-                            [SinkModifiedOn],
-                            [versionnumber]
-                    FROM    cte_source
-                ),
-                cte_most_recent_records AS (
-                    SELECT  s.*
-                    FROM    cte_source s
-                            INNER JOIN cte_rownumber r
-                                ON {primaryKeyJoinPredicates}
-                                AND s.[SinkModifiedOn] = r.[SinkModifiedOn]
-                                AND s.[versionnumber] = r.[versionnumber]
-                    WHERE   r.DvRowNumber = 1
+                            *
+                    FROM    cte_openrowset
                 )
                 SELECT DISTINCT
                     {targetColumnList}
                 FROM
-                    cte_most_recent_records            
+                    cte_rownumber
+                WHERE
+                    DvRowNumber = 1
                 ";
 
             return innerQuery;

@@ -67,18 +67,16 @@ namespace DataverseToSql.Core {
         ///CREATE PROCEDURE [DataverseToSql].[BlobsToIngest_Insert]
         ///	@EntityName [DataverseToSql].[EntityType],
         ///	@BlobName [DataverseToSql].[BlobNameType],
+        ///	@BasePath [DataverseToSql].[BlobNameType],
+        ///	@Timestamp [DataverseToSql].[TimestampType],
         ///	@Partition [DataverseToSql].[BlobPartitionType],
-        ///	@ServerlessQuery NVARCHAR(MAX),
         ///	@LoadType INT
         ///AS
         ///IF NOT EXISTS (
         ///	SELECT * FROM [DataverseToSql].[BlobsToIngest]
         ///	WHERE
         ///		[EntityName] = @EntityName
-        ///		AND [BlobName] = @BlobName
-        ///)
-        ///BEGIN
-        ///	INSERT INTO [DataverseToSql].[Blobs [rest of string was truncated]&quot;;.
+        ///		AND [BlobName] = [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string DataverseToSql_BlobsToIngest_Insert_Proc {
             get {
@@ -94,11 +92,10 @@ namespace DataverseToSql.Core {
         ///	[Id] BIGINT IDENTITY PRIMARY KEY,
         ///	[EntityName] [DataverseToSql].[EntityType] NOT NULL,
         ///	[BlobName] [DataverseToSql].[BlobNameType] NOT NULL,
+        ///	[BasePath] [DataverseToSql].[BlobNameType] NOT NULL,
+        ///	[Timestamp] [DataverseToSql].[TimestampType] NOT NULL,
         ///	[Partition] [DataverseToSql].[BlobPartitionType] NOT NULL,
-        ///	[LoadType] INT NOT NULL, -- Full=0, Incremental=1 (from LoadType enum)
-        ///	[Complete] INT NOT NULL DEFAULT 0,
-        ///	CONSTRAINT UQ_BlobsToIngest UNIQUE ([EntityName], [BlobName]),
-        ///	C [rest of string was truncated]&quot;;.
+        ///	[LoadType] INT NOT NULL, -- Full=0, Incremental=1 (from LoadType [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string DataverseToSql_BlobsToIngest_Table {
             get {
@@ -114,18 +111,22 @@ namespace DataverseToSql.Core {
         ///	@JobId [DataverseToSql].[JobIdType]
         ///AS
         ///
+        ///DECLARE @CompletedBlobs TABLE (
+        ///	[EntityName] [DataverseToSql].[EntityType],
+        ///	[LoadType] INT
+        ///)
+        ///
+        ///BEGIN TRAN
+        ///
         ///UPDATE	a
         ///SET
         ///	[Complete] = 1
+        ///OUTPUT inserted.[EntityName], inserted.[LoadType]
+        ///	INTO @CompletedBlobs
         ///FROM
         ///	[DataverseToSql].[BlobsToIngest] a
         ///	INNER JOIN [DataverseToSql].[BlobsToIngest] b
-        ///		ON a.[Id] &lt;= b.Id
-        ///		AND a.[EntityName] = b.[EntityName]
-        ///		AND a.[LoadType] = b.[LoadType]
-        ///		and a.[Partition] = b.[Partition]
-        ///WHERE
-        ///	b.[Id] = @JobId.
+        ///		ON a.[Id] &lt;= b. [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string DataverseToSql_IngestionJobs_Complete_Proc {
             get {
@@ -140,24 +141,29 @@ namespace DataverseToSql.Core {
         ///CREATE PROCEDURE [DataverseToSql].[IngestionJobs_Get]
         ///AS
         ///
-        ///WITH numbered_blobs AS (
+        ///WITH 
+        ///jobs AS (
         ///	SELECT
-        ///		*,
-        ///		ROW_NUMBER() OVER (PARTITION BY [EntityName] ORDER BY [BlobName]) AS blob_number
+        ///		MAX([Id]) AS [JobId],
+        ///		[EntityName],
+        ///		[BasePath],
+        ///		MIN([Timestamp]) AS [TimestampFrom],
+        ///		MAX([Timestamp]) AS [TimestampTo],
+        ///		[Partition],
+        ///		[LoadType]
         ///	FROM
         ///		[DataverseToSql].[BlobsToIngest]
         ///	WHERE
-        ///		b.[Complete] = 0
-        ///),
-        ///incremental_jobs AS (
-        ///	SELECT
-        ///		MAX(b.[Id]) AS [JobId],
-        ///		[DataverseToSql].[ServerlessQuery](
-        ///			-- OPENROWSET queries
-        ///			STRING_AGG(
-        ///				REPLACE (
-        ///					REPLACE (
-        ///	 [rest of string was truncated]&quot;;.
+        ///		[Complete] = 0
+        ///	GROUP BY
+        ///		[EntityName],
+        ///		[BasePath],
+        ///		[Partition],
+        ///		[LoadType]
+        ///)
+        ///SELECT
+        ///	j.[JobId],
+        ///	e.[EntityName [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string DataverseToSql_IngestionJobs_Get_Proc {
             get {
@@ -271,8 +277,8 @@ namespace DataverseToSql.Core {
         ///	[SchemaHash] NVARCHAR(128) NULL,
         ///	[TargetSchema] SYSNAME NOT NULL,
         ///	[TargetTable] SYSNAME NOT NULL,
-        ///	[InnerQuery] NVARCHAR(MAX) NULL,
-        ///	[OpenrowsetQuery] NVARCHAR(MAX) NULL
+        ///	[FullLoadInnerQuery] NVARCHAR(MAX) NULL,
+        ///	[IncrementalInnerQuery] NVARCHAR(MAX) NULL
         ///).
         /// </summary>
         internal static string DataverseToSql_ManagedEntities_Table {
@@ -291,15 +297,15 @@ namespace DataverseToSql.Core {
         ///	@TargetTable SYSNAME,
         ///	@State INT = NULL,
         ///	@SchemaHash NVARCHAR(128) = NULL,
-        ///	@InnerQuery NVARCHAR(MAX) = NULL,
-        ///	@OpenrowsetQuery NVARCHAR(MAX) = NULL
+        ///	@FullLoadInnerQuery NVARCHAR(MAX) = NULL,
+        ///	@IncrementalInnerQuery NVARCHAR(MAX) = NULL
         ///AS
         ///IF NOT EXISTS (
         ///	SELECT * FROM [DataverseToSql].[ManagedEntities]
         ///	WHERE [EntityName] = @EntityName
         ///)
         ///BEGIN
-        ///	INSERT INTO [DataverseToSql] [rest of string was truncated]&quot;;.
+        ///	INSERT INTO [D [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string DataverseToSql_ManagedEntities_Upsert_Proc {
             get {
@@ -316,36 +322,6 @@ namespace DataverseToSql.Core {
         internal static string DataverseToSql_Schema {
             get {
                 return ResourceManager.GetString("DataverseToSql_Schema", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to -- Copyright (c) Microsoft Corporation.
-        ///-- Licensed under the MIT License.
-        ///
-        ///CREATE FUNCTION [DataverseToSql].[ServerlessQuery]
-        ///(
-        ///	@OpenrowsetQueries nvarchar(max),
-        ///	@InnerQuery nvarchar(max),
-        ///	@ExcludeDeletedRecords bit
-        ///)
-        ///RETURNS nvarchar(max)
-        ///BEGIN
-        ///	SET @InnerQuery = REPLACE(
-        ///		@InnerQuery,
-        ///		&apos;&lt;&lt;&lt;OPENROWSET_PLACEHOLDER&gt;&gt;&gt;&apos;,
-        ///		@OpenrowsetQueries)
-        ///
-        ///	IF @ExcludeDeletedRecords = 1
-        ///	BEGIN
-        ///		SET @InnerQuery = @InnerQuery + &apos; WHERE ISNULL(IsDelete, &apos;&apos;False&apos;&apos;) &lt;&gt; &apos;&apos;True&apos;&apos;&apos;
-        ///	END
-        ///
-        ///	DECLARE @Form [rest of string was truncated]&quot;;.
-        /// </summary>
-        internal static string DataverseToSql_ServerlessQuery_Func {
-            get {
-                return ResourceManager.GetString("DataverseToSql_ServerlessQuery_Func", resourceCulture);
             }
         }
         
@@ -371,7 +347,11 @@ namespace DataverseToSql.Core {
         ///
         ///CREATE TYPE [DataverseToSql].[JobIdType]
         ///	FROM BIGINT;
-        ///GO.
+        ///GO
+        ///
+        ///CREATE TYPE [DataverseToSql].[TimestampType]
+        ///	FROM NVARCHAR(14);
+        /// [rest of string was truncated]&quot;;.
         /// </summary>
         internal static string DataverseToSql_Types {
             get {

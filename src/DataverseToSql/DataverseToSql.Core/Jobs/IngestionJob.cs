@@ -8,6 +8,7 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 using Azure.Storage.Files.DataLake;
 using BlockBlobClientCopyRangeExtension;
+using DataverseToSql.Core.CdmModel;
 using DataverseToSql.Core.Model;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
@@ -189,14 +190,11 @@ namespace DataverseToSql.Core.Jobs
                 var (found, cdmEntity) = await environment.TryGetCdmEntityAsync(managedEntity, cancellationToken);
                 if (found && cdmEntity is not null)
                 {
-                    managedEntity.OpenrowsetQuery = cdmEntity.GetServerlessOpenrowsetQuery();
-
                     var targetColumns = await environment.database.GetTableTypeColumnsAsync(
                         tableName: managedEntity.Name,
                         cancellationToken: cancellationToken);
 
-                    managedEntity.FullLoadInnerQuery = cdmEntity.GetServerlessInnerQuery(targetColumns
-                        .Where(column => !environment.Config.SchemaHandling.SkipIsDeleteColumn || column.ToLower() != "isdelete").ToList());
+                    managedEntity.FullLoadInnerQuery = FullLoadServerlessQuery(cdmEntity, targetColumns);
                     managedEntity.IncrementalInnerQuery = cdmEntity.GetServerlessInnerQuery(targetColumns);
 
                     await environment.database.UpsertAsync(managedEntity, cancellationToken);
@@ -204,6 +202,14 @@ namespace DataverseToSql.Core.Jobs
             }
         }
 
+        private string FullLoadServerlessQuery(CdmEntity cdmEntity, IList<string> targetColumns)
+        {
+            return cdmEntity.GetServerlessInnerQuery(targetColumns
+                .Where(column => !environment.Config.SchemaHandling.SkipIsDeleteColumn || column.ToLower() != "isdelete").ToList())
+                + " AND ISNULL(IsDelete, 'False') <> 'True'";
+        }
+
+       
         // Compare the hash of each custom script with what previously stored
         private async Task<bool> HasAnyCustomScriptChangedAsync(CancellationToken cancellationToken)
         {
