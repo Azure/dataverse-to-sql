@@ -1,5 +1,8 @@
 # DataverseToSql
 
+> [!NOTE]
+> This solution is in maintenance mode. Please consider alternatives, such as [Copy Dataverse data into Azure SQL](https://learn.microsoft.com/en-us/power-apps/maker/data-platform/azure-synapse-link-pipelines?tabs=synapse-analytics)
+
 DataverseToSql is a tool for the incremental transfer of data between [Azure Synapse Link for Dataverse](https://learn.microsoft.com/en-us/power-apps/maker/data-platform/azure-synapse-link-synapse) and [Azure SQL Database](https://learn.microsoft.com/en-us/azure/azure-sql/database/sql-database-paas-overview?view=azuresql).
 
 - Data is transferred incrementally between the container populated by Synapse Link for Dataverse and an Azure SQL Database; this minimizes the amount of data to process while updating the target database.
@@ -90,6 +93,22 @@ The two containers are respectively for storing:
 ### Azure Synapse Analytics workspace
 
 [Provision an Azure Synapse workspace.](https://learn.microsoft.com/en-us/azure/synapse-analytics/quickstart-create-workspace)
+
+### Azure Synapse Apache Spark pool
+
+Create a Spark pool. See [Quickstart: Create a serverless Apache Spark pool using Synapse Studio](https://learn.microsoft.com/en-us/azure/synapse-analytics/quickstart-create-apache-spark-pool-studio).
+
+A recommended starting configuration is Memory Optimized, Large node size with autoscale. Make sure to enable idle timeout to automatically pause the pool.
+
+Spark version must be 3.3.
+
+### Install required packages
+
+The Spark notebooks require two additional libraries. They can be installed as workspace packages as described in [Workspace packages](https://learn.microsoft.com/en-us/azure/synapse-analytics/spark/apache-spark-manage-workspace-packages).
+
+Install the apache Spark connector for SQL Server [Apache Spark connector: SQL Server & Azure SQL](https://learn.microsoft.com/en-us/sql/connect/spark/connector). Make sure to install version 1.3.0 compatible with Spark 3.3.
+
+Install Microsoft JDBC Driver for SQL Server version 8.4. See available downloads here: [Release notes for the Microsoft JDBC Driver for SQL Server](https://learn.microsoft.com/en-us/sql/connect/jdbc/release-notes-for-the-jdbc-driver?view=sql-server-ver16#previous-releases)
 
 ### Assign storage permissions to the Synapse workspace
 
@@ -234,6 +253,8 @@ You can override the authentication process to specify other credentials using t
 - The storage account firewall is configured to enable network access from all networks.
 - Two containers have been created inside the storage account to store incremental blobs and DataverseToSql configuration files, respectively.
 - An Azure Synapse workspace has been deployed.
+- A Spark pool has been created.
+- The required additional packages have been installed.
 - The Synapse workspace has been assigned Storage Blob Data Contributor role on the storage account.
 - A link is established between Dataverse and the Azure storage account using Synapse Link for Dataverse. **Note** The storage account must be the same of the container used to store incremental blobs.
 - _(Optionally)_ Synapse link for Dataverse is configured to connect to the Azure Synapse workspace.
@@ -350,6 +371,8 @@ Default template file:
 | SchemaHandling       | EnableSchemaUpgradeForExistingTables | true    | Enable the propagation of schema changes for existing tables.                                                                                               |
 | SchemaHandling       | OptionSetInt32                       | false   | Use int instead of long for integer OptionSet fields. **Note**: once set to true, the option cannot be to false; all tables must be removed and redeployed. |
 | SchemaHandling       | SkipIsDeleteColumn                   | false   | Skip the IsDelete column when generating the target tables.                                                                                                 |
+| Spark                | SparkPool                            |         | Name of the Spark pool.                                                                                                                                     |
+| Spark                | EntityConcurrency                    | 4       | Number of entities to process in parallel during full load via Spark.                                                                                       |
 
 ### Customize column data types
 

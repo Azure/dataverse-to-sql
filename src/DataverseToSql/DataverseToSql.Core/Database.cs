@@ -448,13 +448,28 @@ namespace DataverseToSql.Core
             return completedBlobs;
         }
 
-        internal async Task<bool> AreBlobsPendingIngestion(CancellationToken cancellationToken)
+        internal async Task<bool> AreIncrementalBlobsPendingIngestion(CancellationToken cancellationToken)
         {
             var conn = await GetSqlConnectionAsync(cancellationToken);
             var cmd = conn.CreateCommand();
 
             cmd.CommandText = string.Format(
-                "SELECT TOP 1 1 FROM [DataverseToSql].[BlobsToIngest] WHERE [Complete] = 0;"
+                "SELECT TOP 1 1 FROM [DataverseToSql].[BlobsToIngest] WHERE [LoadType] = 1 AND [Complete] = 0;"
+                );
+
+            var result = await cmd.ExecuteScalarAsync(cancellationToken);
+            conn.Close();
+
+            return result is int value && value == 1;
+        }
+
+        internal async Task<bool> AreFullBlobsPendingIngestion(CancellationToken cancellationToken)
+        {
+            var conn = await GetSqlConnectionAsync(cancellationToken);
+            var cmd = conn.CreateCommand();
+
+            cmd.CommandText = string.Format(
+                "SELECT TOP 1 1 FROM [DataverseToSql].[BlobsToIngest] WHERE [LoadType] = 0 AND [Complete] = 0;"
                 );
 
             var result = await cmd.ExecuteScalarAsync(cancellationToken);

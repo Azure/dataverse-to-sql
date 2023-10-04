@@ -101,11 +101,17 @@ namespace DataverseToSql.Core.Jobs
                         }
                     });
 
-                // If there is any blob to be ingested, start the Synapse ingestion pipeline
-                if (await environment.database.AreBlobsPendingIngestion(cancellationToken))
-                    StartIngestionPipeline();
+                // If there is any incremental blob to be ingested, start the corrensponding Synapse ingestion pipeline
+                if (await environment.database.AreIncrementalBlobsPendingIngestion(cancellationToken))
+                    StartIncrementalIngestionPipeline();
                 else
-                    log.LogInformation("No new data to process. The ingestion pipeline will not be started.");
+                    log.LogInformation("No new incremental data to process. The ingestion pipeline will not be started.");
+
+                // If there is any full blob to be ingested, start the corresponding Synapse ingestion pipeline
+                if (await environment.database.AreFullBlobsPendingIngestion(cancellationToken))
+                    StartFullIngestionPipeline();
+                else
+                    log.LogInformation("No new full load data to process. The ingestion pipeline will not be started.");
 
                 // Remove completed incremental blobs
                 await DeleteCompletedBlobsToIngestAsync(parallelOps, cancellationToken);
@@ -579,8 +585,18 @@ namespace DataverseToSql.Core.Jobs
             }
         }
 
+        private void StartIncrementalIngestionPipeline()
+        {
+            StartIngestionPipeline(Naming.IncrementalLoadPipelineName());
+        }
+
+        private void StartFullIngestionPipeline()
+        {
+            StartIngestionPipeline(Naming.FullLoadPipelineName());
+        }
+
         // Start the Synapse ingestion pipeline
-        private void StartIngestionPipeline()
+        private void StartIngestionPipeline(string pipelineName)
         {
             // Check if the pipeline is already running or queued
             // for runs in the last 24 hours
@@ -597,7 +613,7 @@ namespace DataverseToSql.Core.Jobs
             filter.Filters.Add(new(
                 new("PipelineName"),
                 RunQueryFilterOperator.EqualsValue,
-                new List<string>() { Naming.IngestionPipelineName() }));
+                new List<string>() { pipelineName }));
 
             // Filter runs status InProgress or Queued
             filter.Filters.Add(new(
@@ -613,7 +629,7 @@ namespace DataverseToSql.Core.Jobs
             {
                 log.LogInformation(
                     "Pipeline {pipeline} already running. Check pipeline runs in Synapse Studio for progress.",
-                    Naming.IngestionPipelineName());
+                    pipelineName);
                 return;
             }
 
@@ -623,11 +639,11 @@ namespace DataverseToSql.Core.Jobs
 
             // Create the pipeline run
             var response = pipelineClient.CreatePipelineRun(
-                Naming.IngestionPipelineName()).Value;
+                pipelineName).Value;
 
             log.LogInformation(
                 "Pipeline {pipeline} successfully started with Run ID {runID}. Check pipeline runs in Synapse Studio for progress.",
-                Naming.IngestionPipelineName(),
+                pipelineName,
                 response.RunId);
         }
     }
