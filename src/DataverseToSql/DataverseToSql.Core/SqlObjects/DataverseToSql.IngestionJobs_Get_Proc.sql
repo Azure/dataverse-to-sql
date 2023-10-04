@@ -18,6 +18,7 @@ jobs AS (
 		[DataverseToSql].[BlobsToIngest]
 	WHERE
 		[Complete] = 0
+		AND [LoadType] = 1
 	GROUP BY
 		[EntityName],
 		[BasePath],

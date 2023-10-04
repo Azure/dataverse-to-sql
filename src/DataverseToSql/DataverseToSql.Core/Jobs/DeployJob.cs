@@ -10,7 +10,8 @@ using Microsoft.SqlServer.TransactSql.ScriptDom;
 using System.Data;
 using Expression = Azure.Analytics.Synapse.Artifacts.Models.Expression;
 using ExpressionType = Azure.Analytics.Synapse.Artifacts.Models.ExpressionType;
-using SwitchCase = Azure.Analytics.Synapse.Artifacts.Models.SwitchCase;
+using System.Text.Json;
+using System.Text;
 
 namespace DataverseToSql.Core.Jobs
 {
@@ -47,8 +48,12 @@ namespace DataverseToSql.Core.Jobs
             CreateLinkedServices();
             // Create the Synapse datasets
             CreateDatasets();
-            // Create the Synapse ingestion pipeline
-            CreateIngestionPipeline();
+            // Create the Spark notebooks
+            CreateRootNotebook();
+            CreateProcessEntityNotebook();
+            // Create the Synapse ingestion pipelines
+            CreateIncrementalLoadPipeline();
+            CreateFullLoadPipeline();
 
             // Upload the configuration files to the configuration storage container
             UploadConfiguration();
@@ -268,10 +273,10 @@ namespace DataverseToSql.Core.Jobs
             }
         }
 
-        // Create the Synapse ingestion pipeline
-        private void CreateIngestionPipeline()
+        // Create the Synapse incremental load pipeline
+        private void CreateIncrementalLoadPipeline()
         {
-            log.LogInformation("Creating ingestion pipeline");
+            log.LogInformation("Creating incremental load pipeline");
 
             var pipeline = new PipelineResource
             {
@@ -370,48 +375,6 @@ namespace DataverseToSql.Core.Jobs
 
             pipeline.Activities.Add(lookupIngestionJobsActivity);
 
-            // Activity: Full Load
-            // Copy activity that performs the full load of a blob to Azure SQL Database.
-
-            // The source is the query for Serverless SQL Pool
-            // retrieved by the lookup action
-            var fullLoadSource = new AzureSqlSource()
-            {
-                SqlReaderQuery = new Expression(
-                    ExpressionType.Expression,
-                    "@item().ServerlessQuery")
-            };
-
-            // The sink is configured for insert and to use table lock.
-            var fullLoadSink = new AzureSqlSink();
-            fullLoadSink.AdditionalProperties["writeBehavior"] = "insert";
-            fullLoadSink.AdditionalProperties["sqlWriterUseTableLock"] = true;
-
-            var fullLoadActivity = new CopyActivity(
-                "Full load",
-                fullLoadSource,
-                fullLoadSink)
-            {
-                EnableStaging = false
-            };
-
-            fullLoadActivity.Inputs.Add(new(DatasetReferenceType.DatasetReference,
-                Naming.ServerlessDatasetName()));
-
-            var fullLoadOutputReference = new DatasetReference(DatasetReferenceType.DatasetReference,
-                Naming.AzureSqlDatasetName());
-
-            // The target schema and table name are dynamic and are
-            // retrieved by the lookup activity
-            fullLoadOutputReference.Parameters["Schema"] = new Expression(
-                ExpressionType.Expression,
-                "@item().TargetSchema");
-            fullLoadOutputReference.Parameters["Table"] = new Expression(
-                ExpressionType.Expression,
-                "@item().TargetTable");
-
-            fullLoadActivity.Outputs.Add(fullLoadOutputReference);
-
             // Activity: Incremental load
             // Copy activity that performs the incremental load of a blob to Azure SQL Database.
 
@@ -464,25 +427,6 @@ namespace DataverseToSql.Core.Jobs
 
             incrementalLoadActivity.Outputs.Add(incrementalOutputReference);
 
-            // Activity: Switch load type
-            // The switch activity determines whether to run the full load or
-            // the incremental load copy activity based on the value of the LoadType
-            // field returned by the lookup activity.
-            // 0 = full load
-            // 1 = incrementa load
-
-            var switchLoadTypeActivity = new SwitchActivity(
-                "Switch load type",
-                new Expression(ExpressionType.Expression, "@string(item().LoadType)"));
-
-            var fullLoadCase = new SwitchCase() { Value = "0", }; // full load
-            fullLoadCase.Activities.Add(fullLoadActivity);
-            switchLoadTypeActivity.Cases.Add(fullLoadCase);
-
-            var incrementalLoadCase = new SwitchCase() { Value = "1" }; // incremental load
-            incrementalLoadCase.Activities.Add(incrementalLoadActivity);
-            switchLoadTypeActivity.Cases.Add(incrementalLoadCase);
-
             // Activity: Mark job complete
             // The activity marks an ingestion job as complete
             // The logic is implemented in the [DataverseToSql].[IngestionJobs_Complete]
@@ -509,7 +453,7 @@ namespace DataverseToSql.Core.Jobs
 
             markBlobCompleteActivity.DependsOn.Add(
                 new ActivityDependency(
-                    switchLoadTypeActivity.Name,
+                    incrementalLoadActivity.Name,
                     new List<DependencyCondition>() { new("Succeeded") }));
 
             // Activity: For each blob to ingest
@@ -521,7 +465,7 @@ namespace DataverseToSql.Core.Jobs
                 new Expression(ExpressionType.Expression, "@activity('Lookup ingestion jobs').output.value"),
                 new List<Activity>()
                 {
-                    switchLoadTypeActivity,
+                    incrementalLoadActivity,
                     markBlobCompleteActivity
                 })
             {
@@ -562,7 +506,125 @@ namespace DataverseToSql.Core.Jobs
             CreatePipeline(
                 pipelineClient,
                 pipeline,
-                Naming.IngestionPipelineName());
+                Naming.IncrementalLoadPipelineName());
+        }
+
+        // Create the Synapse full load pipeline
+        private void CreateFullLoadPipeline()
+        {
+            log.LogInformation("Creating full load pipeline");
+
+            var pipeline = new PipelineResource
+            {
+                Folder = new PipelineFolder()
+                {
+                    Name = Naming.PipelineFolderName()
+                },
+                Concurrency = 1 // Set pipeline concurrency to 1 to prevent concurrent ingestion processes
+            };
+
+            // Activity: Root notebook
+            var rootNotebookActivity = new SynapseNotebookActivity(
+                "Execute root notebook",
+                new SynapseNotebookReference(
+                    NotebookReferenceType.NotebookReference,
+                    Naming.RootNotebookName()))
+            {
+                SparkPool = new(
+                BigDataPoolReferenceType.BigDataPoolReference,
+                environment.Config.Spark.SparkPool),
+                ExecutorSize = "Medium",
+                DriverSize = "Medium",
+                Conf = new Dictionary<string, object>()
+                {
+                    { "spark.dynamicAllocation.enabled", true },
+                    { "spark.dynamicAllocation.minExecutors", 4 },
+                    { "spark.dynamicAllocation.maxExecutors", 10 }
+                }
+            };
+
+            rootNotebookActivity.Parameters["target_schema"] = new() { Type = new("string"), Value = environment.Config.Database.Schema };
+            rootNotebookActivity.Parameters["storage_account"] = new() { Type = new("string"), Value = environment.Config.DataverseStorage.AccountName() };
+            rootNotebookActivity.Parameters["container"] = new() { Type = new("string"), Value = environment.Config.DataverseStorage.Container };
+            rootNotebookActivity.Parameters["servername"] = new() { Type = new("string"), Value = environment.Config.Database.Server };
+            rootNotebookActivity.Parameters["dbname"] = new() { Type = new("string"), Value = environment.Config.Database.Database };
+            rootNotebookActivity.Parameters["entity_concurrency"] = new() { Type = new("int"), Value = environment.Config.Spark.EntityConcurrency };
+
+            pipeline.Activities.Add(rootNotebookActivity);
+
+            // Create the pipeline
+            var pipelineClient = new PipelineClient(
+                new Uri(environment.Config.SynapseWorkspace.DevEndpoint()),
+                environment.Credential);
+
+            CreatePipeline(
+                pipelineClient,
+                pipeline,
+                Naming.FullLoadPipelineName());
+        }
+
+        private void CreateRootNotebook()
+        {
+            var notebook = Encoding.UTF8.GetString(Notebooks.DataverseToSql_RootNotebook);
+
+            CreateNotebook(
+                Naming.RootNotebookName(),
+                notebook.Replace(
+                    "$$PROCESS_ENTITY_NOTEBOOK_NAME$$",
+                    Naming.ProcessEntityNotebookName()));
+        }
+
+        private void CreateProcessEntityNotebook()
+        {
+            CreateNotebook(Naming.ProcessEntityNotebookName(), Notebooks.DataverseToSql_ProcessEntity);
+        }
+
+        private void CreateNotebook(string name, byte[] content)
+        {
+            CreateNotebook(name, Encoding.UTF8.GetString(content));
+        }
+
+        private void CreateNotebook(string name, string content)
+        {
+            log.LogInformation("Creating notebook {notebook}", name);
+
+            var notebook = JsonSerializer.Deserialize<Notebook>(content);
+
+            var notebookResource = new NotebookResource(
+                name,
+                notebook);
+
+            notebookResource.Properties.BigDataPool = new BigDataPoolReference(
+                BigDataPoolReferenceType.BigDataPoolReference,
+                environment.Config.Spark.SparkPool);
+
+            var notebookClient = new NotebookClient(
+                new Uri(environment.Config.SynapseWorkspace.DevEndpoint()),
+                environment.Credential);
+
+            var createOp = notebookClient.StartCreateOrUpdateNotebook(
+                name,
+                notebookResource);
+
+            createOp.WaitForCompletion();
+
+            if (!createOp.HasValue)
+            {
+                var response = createOp.GetRawResponse();
+
+                throw new Exception(
+                    $"Creation of noetbook {notebookResource.Name} failed: {response.Status} {response.ReasonPhrase}");
+            }
+
+            var resp = Newtonsoft.Json.JsonConvert.DeserializeObject<dynamic>(
+                createOp.GetRawResponse().Content.ToString());
+
+            if (resp?.status?.Value?.ToLower() == "failed" ?? false)
+            {
+                string message = resp?.error.message.Value.ToString() ?? "unknown";
+
+                throw new Exception($"Creation of notebook {notebookResource.Name} failed: {message}");
+            }
         }
 
         private Dictionary<string, object>[] GetOptionsetTablesDefinition()

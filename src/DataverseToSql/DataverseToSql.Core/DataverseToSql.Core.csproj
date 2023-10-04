@@ -33,6 +33,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Update="Notebooks.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Notebooks.resx</DependentUpon>
+    </Compile>
     <Compile Update="SqlObjects.Designer.cs">
       <DesignTime>True</DesignTime>
       <AutoGen>True</AutoGen>
@@ -41,10 +46,18 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Update="Notebooks.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Notebooks.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
     <EmbeddedResource Update="SqlObjects.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>SqlObjects.Designer.cs</LastGenOutput>
     </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Notebooks\" />
   </ItemGroup>
 
 </Project>

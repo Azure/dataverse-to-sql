@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using Azure.Analytics.Synapse.Artifacts.Models;
 using Azure.Storage.Blobs;
 using Azure.Storage.Files.DataLake;
 using Microsoft.Extensions.Configuration;
@@ -88,6 +89,8 @@ namespace DataverseToSql.Core
 
         public SchemaHandlingConfiguration SchemaHandling { get; set; } = new();
 
+        public SparkPoolConfiguration Spark { get; set; } = new();
+
         // Fill the configuration with placeholder values.
         // Useful to generate a template.
         internal void FillTemplateValues()
@@ -132,6 +135,13 @@ namespace DataverseToSql.Core
             var datalakeUri = $"https://{match.Groups[1].Value}.dfs.core.windows.net/";
 
             return new Uri(datalakeUri);
+        }
+
+        // Account name
+        public string AccountName()
+        {
+            var bub = new BlobUriBuilder(new Uri(StorageAccount));
+            return bub.AccountName;
         }
 
         // Fill the configuration with placeholder values.
@@ -210,6 +220,17 @@ namespace DataverseToSql.Core
         internal void FillTemplateValues()
         {
             EnableSchemaUpgradeForExistingTables = true;
+        }
+    }
+
+    public class SparkPoolConfiguration
+    {
+        public string SparkPool { get; set; } = "";
+        public int EntityConcurrency { get; set; } = 4;
+
+        internal void FillTemplateValues()
+        {
+            SparkPool = "<Name of the Spark pool>";
         }
     }
 }

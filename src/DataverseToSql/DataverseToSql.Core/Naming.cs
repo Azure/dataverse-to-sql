@@ -12,7 +12,8 @@ namespace DataverseToSql.Core
     {
         // Pipelines
         internal static string PipelineFolderName() => "DataverseToSql";
-        internal static string IngestionPipelineName() => $"DataverseToSql_Ingestion"; 
+        internal static string IncrementalLoadPipelineName() => $"DataverseToSql_IncrementalLoad"; 
+        internal static string FullLoadPipelineName() => $"DataverseToSql_FullLoad";
 
         // Datasets
         internal static string DatasetFolder() => "DataverseToSql";
@@ -30,5 +31,9 @@ namespace DataverseToSql.Core
         // type
         internal static string MergeProcName(this CdmEntity entity) => $"[Merge_{entity.Name}]";
         internal static string TableTypeName(this CdmEntity entity) => $"[{entity.Name}_TableType]";
+
+        // Spark
+        internal static string RootNotebookName() => "DataverseToSql_RootNotebook";
+        internal static string ProcessEntityNotebookName() => "DataverseToSql_ProcessEntity";
     }
 }
