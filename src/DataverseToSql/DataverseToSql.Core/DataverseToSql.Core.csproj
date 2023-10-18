@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
@@ -9,7 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="Azure.Analytics.Synapse.Artifacts" Version="1.0.0-preview.16" />
-    <PackageReference Include="Azure.Identity" Version="1.7.0" />
+    <PackageReference Include="Azure.Identity" Version="1.10.2" />
     <PackageReference Include="Azure.Storage.Files.DataLake" Version="12.14.0" />
     <PackageReference Include="Microsoft.Azure.Management.Synapse" Version="2.6.0-preview" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.1" />
