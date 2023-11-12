@@ -33,13 +33,13 @@ SELECT TOP 1 @Entity=[EntityName], @LoadType=[LoadType] FROM @CompletedBlobs
 
 -- For full loads, set entity state to Ready if the initial
 -- load of all blobs of the entity is complete
-IF	@LoadType = 0 -- Full load
+IF	@LoadType in (0, 2) -- Full load
 	AND NOT EXISTS (
 		SELECT *
 		FROM [DataverseToSql].[BlobsToIngest]
 		WHERE
 			[EntityName] = @Entity
-			AND [LoadType] = 0 -- Full load
+			AND [LoadType] IN (0, 2) -- Full load
 			AND [Complete] = 0)
 BEGIN
 	UPDATE [DataverseToSql].[ManagedEntities] 

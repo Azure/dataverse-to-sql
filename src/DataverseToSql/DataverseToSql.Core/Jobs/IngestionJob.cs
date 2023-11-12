@@ -144,8 +144,17 @@ namespace DataverseToSql.Core.Jobs
                     log.LogInformation("Deleting completed incremental blob {incrementalBlobName}", blob.BlobName);
 
                     var blobUri = new Uri(blob.BlobName);
-                    var fileClient = fileSystemClient.GetFileClient(string.Join("", blobUri.Segments[2..]));
-                    await fileClient.DeleteIfExistsAsync(cancellationToken: ct);
+
+                    if (blob.IsDirectory)
+                    {
+                        var directoryClient = fileSystemClient.GetDirectoryClient(string.Join("", blobUri.Segments[2..]));
+                        await directoryClient.DeleteIfExistsAsync(cancellationToken: ct);
+                    }
+                    else
+                    {
+                        var fileClient = fileSystemClient.GetFileClient(string.Join("", blobUri.Segments[2..]));
+                        await fileClient.DeleteIfExistsAsync(cancellationToken: ct);
+                    }
 
                     directoriesToDelete[string.Join("", blobUri.Segments[2..^1])] = 1;
 
