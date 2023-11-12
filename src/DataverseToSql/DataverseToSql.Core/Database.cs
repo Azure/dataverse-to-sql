@@ -12,6 +12,8 @@ using Microsoft.SqlServer.TransactSql.ScriptDom;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
+using System.IO;
+using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace DataverseToSql.Core
@@ -428,19 +430,32 @@ namespace DataverseToSql.Core
             return result;
         }
 
-        internal async Task<IList<(long Id, string BlobName)>> GetCompletedBlobsToIngest(CancellationToken cancellationToken)
+        internal async Task<IList<(long Id, string BlobName, bool IsDirectory)>> GetCompletedBlobsToIngest(CancellationToken cancellationToken)
         {
             var conn = await GetSqlConnectionAsync(cancellationToken);
             var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT [Id], [BlobName] FROM [DataverseToSql].[BlobsToIngest] WHERE [Complete] = 1;";
+            cmd.CommandText = "SELECT [Id], [BlobName], [LoadType] FROM [DataverseToSql].[BlobsToIngest] WHERE [Complete] = 1;";
 
-            List<(long Id, string BlobName)> completedBlobs = new();
+            List<(long Id, string BlobName, bool IsDirectory)> completedBlobs = new();
 
             var reader = await cmd.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
+                var blobName = reader.GetString(1);
+                var isDirectory = false;
+
+                if (reader.GetInt32(2) == 2) // LoadType 2 
+                {
+                    var match = Regex.Match(blobName, @"abfss://([^@]+)@([^.]+)\.dfs\.core\.windows.net(.+)");
+                    if (match is not null)
+                    {
+                        blobName = $"https://{match.Groups[2]}.blob.core.windows.net/{match.Groups[1]}{match.Groups[3]}";
+                    }
+                    isDirectory = true;
+                }
+
                 completedBlobs.Add(
-                    new(reader.GetInt64(0), reader.GetString(1)));
+                    new(reader.GetInt64(0), blobName, isDirectory));
             }
             reader.Close();
             conn.Close();
