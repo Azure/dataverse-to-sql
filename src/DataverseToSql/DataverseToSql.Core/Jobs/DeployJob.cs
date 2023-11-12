@@ -543,6 +543,12 @@ namespace DataverseToSql.Core.Jobs
                 }
             };
 
+            rootNotebookActivity.Policy = new()
+            {
+                Timeout = "7.00:00:00",
+                Retry = 0
+            };
+
             rootNotebookActivity.Parameters["target_schema"] = new() { Type = new("string"), Value = environment.Config.Database.Schema };
             rootNotebookActivity.Parameters["storage_account"] = new() { Type = new("string"), Value = environment.Config.DataverseStorage.AccountName() };
             rootNotebookActivity.Parameters["container"] = new() { Type = new("string"), Value = environment.Config.DataverseStorage.Container };
