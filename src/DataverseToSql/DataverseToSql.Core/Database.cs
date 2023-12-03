@@ -484,7 +484,7 @@ namespace DataverseToSql.Core
             var cmd = conn.CreateCommand();
 
             cmd.CommandText = string.Format(
-                "SELECT TOP 1 1 FROM [DataverseToSql].[BlobsToIngest] WHERE [LoadType] = 0 AND [Complete] = 0;"
+                "SELECT TOP 1 1 FROM [DataverseToSql].[BlobsToIngest] WHERE [LoadType] IN (0,2) AND [Complete] = 0;"
                 );
 
             var result = await cmd.ExecuteScalarAsync(cancellationToken);
